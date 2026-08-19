@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  /* EduNexa palette */
+  --color-paper: #faf7f4;
+  --color-surface: #ffffff;
+  --color-ink: #231a26;
+  --color-muted: #6e6472;
+  --color-soft: #e7dee3;
+  --color-primary: #b02a50;
+  --color-primary-strong: #8e1f3f;
+  --color-primary-soft: #f7e6ec;
+  --color-aubergine: #2a1e2f;
+  --color-aubergine-light: #3d2c44;
+  --color-amber: #e8a33d;
+  --color-success: #2e7d5b;
+  --color-success-soft: #e4f2ec;
+  --color-danger: #b3261e;
+  --color-danger-soft: #fbeae9;
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Dashboard panels settle in on mount; disabled by the reduced-motion block below. */
+@utility animate-rise-in {
+  animation: rise-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+body {
+  @apply bg-paper font-sans text-ink antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
