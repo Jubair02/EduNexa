@@ -33,17 +33,59 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/** True when the payload is this API's `{ success, message }` envelope. */
+const isApiEnvelope = (body: unknown): body is ApiResponse =>
+  typeof body === "object" &&
+  body !== null &&
+  typeof (body as { message?: unknown }).message === "string";
+
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiResponse>) => {
-    const body = error.response?.data;
-    const message =
-      body?.message ??
-      (error.code === "ECONNABORTED" || error.code === "ERR_NETWORK"
-        ? "Can't reach the server. Check your connection and try again."
-        : "Something went wrong. Please try again.");
+    const response = error.response;
+    const body = response?.data;
+
+    if (isApiEnvelope(body)) {
+      return Promise.reject(
+        new ApiRequestError(body.message, response?.status, body.errors)
+      );
+    }
+
+    // No response at all — the request never completed (offline, DNS failure,
+    // CORS block, or the 15s timeout elapsed).
+    if (!response) {
+      return Promise.reject(
+        new ApiRequestError(
+          "Can't reach the server. Check your connection and try again."
+        )
+      );
+    }
+
+    // A response arrived, but it is not this API's envelope — so something
+    // other than the API answered (a host's 404/502 page, a proxy, a redirect
+    // to an SPA fallback). Almost always a misconfigured API base URL, so log
+    // the full target to make that visible.
+    // baseURL may be relative ("/api"), so resolve against the page origin.
+    const base = (error.config?.baseURL ?? "").replace(/\/+$/, "");
+    const path = error.config?.url ?? "";
+    const url = new URL(
+      `${base}${path.startsWith("/") ? "" : "/"}${path}`,
+      window.location.origin
+    );
+
+    const raw: unknown = response.data;
+    console.error(
+      `[api] ${error.config?.method?.toUpperCase() ?? "GET"} ${url.href} ` +
+        `returned ${response.status} with a non-API body:`,
+      typeof raw === "string" ? raw.slice(0, 300) : raw
+    );
+
     return Promise.reject(
-      new ApiRequestError(message, error.response?.status, body?.errors)
+      new ApiRequestError(
+        `The server at ${url.origin} did not return a valid API response ` +
+          `(HTTP ${response.status}). The API URL may be misconfigured.`,
+        response.status
+      )
     );
   }
 );
