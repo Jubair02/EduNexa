@@ -1,24 +1,10 @@
 import { Request, Response } from "express";
-import { Viewer } from "../services/courses.service";
 import * as enrollmentsService from "../services/enrollments.service";
-import { ApiError } from "../utils/ApiError";
 import {
   AllEnrollmentsQuery,
   EnrollmentListQuery,
 } from "../validators/enrollments.validators";
-
-const requireViewer = (req: Request): Viewer => {
-  if (!req.user) {
-    throw ApiError.unauthorized();
-  }
-  return { id: req.user._id.toString(), role: req.user.role };
-};
-
-// Express 5 types route params as string | string[].
-const param = (req: Request, name: string): string => {
-  const value = req.params[name];
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-};
+import { param, requireViewer } from "../utils/requestContext";
 
 export const enroll = async (req: Request, res: Response): Promise<void> => {
   const enrollment = await enrollmentsService.enroll(

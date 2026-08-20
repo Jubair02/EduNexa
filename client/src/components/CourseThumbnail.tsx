@@ -1,6 +1,7 @@
 import { BookOpen } from "lucide-react";
 import type { Course } from "@/types";
 import { cn } from "@/utils/cn";
+import { safeUrl } from "@/utils/safeUrl";
 
 /** Course image with a branded placeholder when no thumbnail is set. */
 export const CourseThumbnail = ({
@@ -10,10 +11,12 @@ export const CourseThumbnail = ({
   course: Pick<Course, "title" | "thumbnail">;
   className?: string;
 }) => {
-  if (course.thumbnail?.url) {
+  // A stored thumbnail is only rendered when it is a safe http(s) URL.
+  const url = safeUrl(course.thumbnail?.url);
+  if (url) {
     return (
       <img
-        src={course.thumbnail.url}
+        src={url}
         alt={`${course.title} thumbnail`}
         className={cn("h-full w-full object-cover", className)}
         loading="lazy"

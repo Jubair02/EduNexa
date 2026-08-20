@@ -3,6 +3,7 @@ import {
   BookOpen,
   FileEdit,
   GraduationCap,
+  Plus,
   Target,
   UserX,
   Users,
@@ -10,10 +11,10 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { AttentionPanel, type AttentionItem } from "@/components/admin/AttentionPanel";
-import { BreakdownList, ShareBar, type BreakdownItem } from "@/components/admin/Breakdown";
-import { DashboardHero } from "@/components/admin/DashboardHero";
-import { DonutChart, type DonutSegment } from "@/components/admin/DonutChart";
+import { AttentionPanel, type AttentionItem } from "@/components/dashboard/AttentionPanel";
+import { BreakdownList, ShareBar, type BreakdownItem } from "@/components/dashboard/Breakdown";
+import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { DonutChart, type DonutSegment } from "@/components/dashboard/DonutChart";
 import { RecentUsersPanel } from "@/components/admin/RecentUsersPanel";
 import {
   StatTile,
@@ -267,6 +268,28 @@ export const AdminDashboard = () => {
     <div className="space-y-5">
       <DashboardHero
         firstName={user?.firstName ?? "Admin"}
+        eyebrow="Admin overview"
+        subtitle="Here's what's happening on EduNexa."
+        actions={
+          <>
+            <Link to="/admin/courses/new" className="flex-1 sm:flex-none">
+              <Button size="sm" className="h-11 w-full whitespace-nowrap sm:h-9">
+                <Plus className="size-4" aria-hidden="true" />
+                New course
+              </Button>
+            </Link>
+            <Link to="/admin/users" className="flex-1 sm:flex-none">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-11 w-full border border-white/25 bg-white/10 whitespace-nowrap text-white hover:bg-white/20 sm:h-9"
+              >
+                <Users className="size-4" aria-hidden="true" />
+                Manage users
+              </Button>
+            </Link>
+          </>
+        }
         updatedAt={updatedAt}
         isRefreshing={status === "loading"}
         onRefresh={() => void load()}

@@ -8,9 +8,13 @@
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
     "build": "npm --prefix server run build && npm --prefix client run build",
-    "test": "npm --prefix server run test",
+    "test": "npm run test:server && npm run test:client",
+    "test:server": "npm --prefix server run test",
+    "test:client": "npm --prefix client run test",
     "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
-    "lint": "npm --prefix server run lint && npm --prefix client run lint"
+    "lint": "npm --prefix server run lint && npm --prefix client run lint",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "seed:admin": "npm --prefix server run seed:admin --"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

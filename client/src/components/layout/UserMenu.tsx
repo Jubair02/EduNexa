@@ -1,6 +1,6 @@
 import { ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/utils/cn";
@@ -118,24 +118,20 @@ export const UserMenu = ({
           </div>
 
           <div className="p-1.5">
-            {/* Profile and settings screens land in a later phase — shown as
-                disabled rows so the menu doesn't link to nowhere. */}
             {[
-              { label: "Profile", icon: UserRound },
-              { label: "Settings", icon: Settings },
-            ].map(({ label, icon: Icon }) => (
-              <div
+              { label: "Profile", icon: UserRound, to: "/profile" },
+              { label: "Settings", icon: Settings, to: "/settings" },
+            ].map(({ label, icon: Icon, to }) => (
+              <Link
                 key={label}
+                to={to}
                 role="menuitem"
-                aria-disabled="true"
-                className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-primary-soft hover:text-ink"
               >
                 <Icon className="size-4" aria-hidden="true" />
                 <span className="flex-1">{label}</span>
-                <span className="rounded-full bg-soft px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
-                  Soon
-                </span>
-              </div>
+              </Link>
             ))}
           </div>
 

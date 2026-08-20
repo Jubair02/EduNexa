@@ -102,44 +102,80 @@ export const QuizResultsModal = ({
               No attempts yet. Results appear here once students submit.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-soft text-xs text-muted uppercase">
-                    <th className="py-2 pr-4 font-medium">Student</th>
-                    <th className="py-2 pr-4 font-medium">Score</th>
-                    <th className="py-2 pr-4 font-medium">Result</th>
-                    <th className="py-2 font-medium">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attempts.map((attempt) => (
-                    <tr key={attempt.attemptId} className="border-b border-soft last:border-0">
-                      <td className="py-2.5 pr-4">
-                        <p className="font-medium">
+            <>
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto sm:block">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-soft text-xs text-muted uppercase">
+                      <th className="py-2 pr-4 font-medium">Student</th>
+                      <th className="py-2 pr-4 font-medium">Score</th>
+                      <th className="py-2 pr-4 font-medium">Result</th>
+                      <th className="py-2 font-medium">Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attempts.map((attempt) => (
+                      <tr key={attempt.attemptId} className="border-b border-soft last:border-0">
+                        <td className="py-2.5 pr-4">
+                          <p className="font-medium">
+                            {attempt.student
+                              ? `${attempt.student.firstName} ${attempt.student.lastName}`
+                              : "Deleted user"}
+                          </p>
+                          <p className="text-xs text-muted">{attempt.student?.email ?? "—"}</p>
+                        </td>
+                        <td className="py-2.5 pr-4 tabular-nums">
+                          {attempt.score}/{attempt.totalPoints}{" "}
+                          <span className="text-muted">({attempt.percentage}%)</span>
+                        </td>
+                        <td className="py-2.5 pr-4">
+                          <Badge variant={attempt.passed ? "success" : "muted"}>
+                            {attempt.passed ? "Passed" : "Failed"}
+                          </Badge>
+                        </td>
+                        <td className="py-2.5 text-muted">
+                          {new Date(attempt.submittedAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards. This lives inside a dialog, so the breakpoint is
+                  `sm` — the panel is already narrower than the viewport. */}
+              <ul className="space-y-2.5 sm:hidden" aria-label="Quiz attempts">
+                {attempts.map((attempt) => (
+                  <li key={attempt.attemptId} className="rounded-xl border border-soft p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">
                           {attempt.student
                             ? `${attempt.student.firstName} ${attempt.student.lastName}`
                             : "Deleted user"}
                         </p>
-                        <p className="text-xs text-muted">{attempt.student?.email ?? "—"}</p>
-                      </td>
-                      <td className="py-2.5 pr-4 tabular-nums">
-                        {attempt.score}/{attempt.totalPoints}{" "}
-                        <span className="text-muted">({attempt.percentage}%)</span>
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        <Badge variant={attempt.passed ? "success" : "muted"}>
-                          {attempt.passed ? "Passed" : "Failed"}
-                        </Badge>
-                      </td>
-                      <td className="py-2.5 text-muted">
-                        {new Date(attempt.submittedAt).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <p className="text-xs break-all text-muted">
+                          {attempt.student?.email ?? "—"}
+                        </p>
+                      </div>
+                      <Badge variant={attempt.passed ? "success" : "muted"}>
+                        {attempt.passed ? "Passed" : "Failed"}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-xs">
+                      <span className="tabular-nums">
+                        {attempt.score}/{attempt.totalPoints} ({attempt.percentage}%)
+                      </span>
+                      <span className="text-muted">
+                        {" "}
+                        · {new Date(attempt.submittedAt).toLocaleDateString()}
+                      </span>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
 
           {pagination && pagination.totalPages > 1 && (

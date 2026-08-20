@@ -7,22 +7,10 @@ import {
 } from "../services/certificate-pdf.service";
 import * as certificatesService from "../services/certificates.service";
 import { getCourseCompletionStatistics } from "../services/course-completion.service";
-import { Viewer, canManageCourse } from "../services/courses.service";
+import { canManageCourse } from "../services/courses.service";
 import { ApiError } from "../utils/ApiError";
 import { CertificateListQuery } from "../validators/certificates.validators";
-
-const requireViewer = (req: Request): Viewer => {
-  if (!req.user) {
-    throw ApiError.unauthorized();
-  }
-  return { id: req.user._id.toString(), role: req.user.role };
-};
-
-// Express 5 types route params as string | string[].
-const param = (req: Request, name: string): string => {
-  const value = req.params[name];
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-};
+import { param, requireActor, requireViewer } from "../utils/requestContext";
 
 export const listCertificates = async (req: Request, res: Response): Promise<void> => {
   const query = res.locals.query as CertificateListQuery;
@@ -84,7 +72,8 @@ export const verifyCertificate = async (req: Request, res: Response): Promise<vo
 export const setCertificateStatus = async (req: Request, res: Response): Promise<void> => {
   const certificate = await certificatesService.setCertificateStatus(
     param(req, "id"),
-    req.body
+    req.body,
+    requireActor(req)
   );
   res.status(200).json({
     success: true,

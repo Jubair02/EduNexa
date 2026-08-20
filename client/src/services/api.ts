@@ -1,6 +1,6 @@
 import axios, { AxiosError } from "axios";
 import type { ApiResponse, FieldError } from "@/types";
-import { getToken } from "@/utils/token";
+import { clearToken, getToken } from "@/utils/token";
 
 /** Normalized error thrown by every API call. */
 export class ApiRequestError extends Error {
@@ -39,11 +39,28 @@ const isApiEnvelope = (body: unknown): body is ApiResponse =>
   body !== null &&
   typeof (body as { message?: unknown }).message === "string";
 
+/**
+ * Fired when the API rejects our token. AuthContext listens and drops the
+ * session, so an expiry mid-session lands the user on the login page instead of
+ * leaving every subsequent request failing behind a stale token.
+ */
+export const SESSION_EXPIRED_EVENT = "lms:session-expired";
+
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiResponse>) => {
     const response = error.response;
     const body = response?.data;
+
+    // A 401 means the token is missing, invalid, or expired — never a
+    // permissions problem (that is 403), so the only correct response is to
+    // end the session. The login request itself is exempt: a failed login is
+    // a form error, not an expiry.
+    const isLoginAttempt = error.config?.url?.includes("/auth/login") ?? false;
+    if (response?.status === 401 && !isLoginAttempt && getToken()) {
+      clearToken();
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
 
     if (isApiEnvelope(body)) {
       return Promise.reject(

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { COURSE_CATEGORIES, CourseLevel, CourseStatus } from "../models/course.model";
+import { isSafeHttpUrl } from "../utils/safeUrl";
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 
@@ -45,11 +46,21 @@ const instructorIdSchema = z
   .string({ error: "Instructor must be a user id" })
   .regex(OBJECT_ID_PATTERN, "Instructor must be a valid user id");
 
-// A URL sets the thumbnail; an empty string clears it.
+/**
+ * A URL sets the thumbnail; an empty string clears it. Restricted to http(s):
+ * `z.url()` would otherwise accept a `data:` URL that the client renders into
+ * an img src.
+ */
 const thumbnailSchema = z
-  .union([z.url({ error: "Thumbnail must be a valid URL" }), z.literal("")], {
-    error: "Thumbnail must be a valid URL",
-  })
+  .union(
+    [
+      z
+        .url({ error: "Thumbnail must be a valid URL" })
+        .refine(isSafeHttpUrl, "Thumbnail must start with http:// or https://"),
+      z.literal(""),
+    ],
+    { error: "Thumbnail must be a valid URL" }
+  )
   .optional();
 
 const thumbnailPublicIdSchema = z

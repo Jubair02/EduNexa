@@ -16,6 +16,7 @@ import { Viewer, canManageCourse } from "./courses.service";
 import { loadStudentQuiz } from "./quizzes.service";
 import { PaginationMeta } from "./users.service";
 import { AttemptsQuery, SubmitQuizInput } from "../validators/quizzes.validators";
+import { escapeRegex } from "../utils/escapeRegex";
 
 export interface AttemptResult {
   attemptId: string;
@@ -55,9 +56,6 @@ export interface QuizResultsSummary {
   studentsPassed: number;
   averagePercentage: number | null;
 }
-
-const escapeRegex = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const toResult = (attempt: QuizAttemptDocument, quizTitle: string): AttemptResult => ({
   attemptId: attempt._id.toString(),

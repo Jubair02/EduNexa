@@ -123,48 +123,86 @@ export const AdminQuizAttemptsPage = () => {
           )}
 
           {status === "ready" && attempts.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-soft text-xs text-muted uppercase">
-                    <th className="py-2 pr-4 font-medium">Student</th>
-                    <th className="py-2 pr-4 font-medium">Quiz</th>
-                    <th className="py-2 pr-4 font-medium">Score</th>
-                    <th className="py-2 pr-4 font-medium">Result</th>
-                    <th className="py-2 font-medium">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attempts.map((attempt) => (
-                    <tr key={attempt.attemptId} className="border-b border-soft last:border-0">
-                      <td className="py-3 pr-4">
+            <>
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-soft text-xs text-muted uppercase">
+                      <th className="py-2 pr-4 font-medium">Student</th>
+                      <th className="py-2 pr-4 font-medium">Quiz</th>
+                      <th className="py-2 pr-4 font-medium">Score</th>
+                      <th className="py-2 pr-4 font-medium">Result</th>
+                      <th className="py-2 font-medium">Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attempts.map((attempt) => (
+                      <tr key={attempt.attemptId} className="border-b border-soft last:border-0">
+                        <td className="py-3 pr-4">
+                          <p className="font-medium">
+                            {attempt.student
+                              ? `${attempt.student.firstName} ${attempt.student.lastName}`
+                              : "Deleted user"}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {attempt.student?.email ?? "—"}
+                          </p>
+                        </td>
+                        <td className="py-3 pr-4">{attempt.quizTitle || "—"}</td>
+                        <td className="py-3 pr-4 tabular-nums">
+                          {attempt.score}/{attempt.totalPoints}{" "}
+                          <span className="text-muted">({attempt.percentage}%)</span>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <Badge variant={attempt.passed ? "success" : "muted"}>
+                            {attempt.passed ? "Passed" : "Failed"}
+                          </Badge>
+                        </td>
+                        <td className="py-3 text-muted">
+                          {new Date(attempt.submittedAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards — a five-column table is a sideways drag on a phone. */}
+              <ul className="space-y-3 md:hidden" aria-label="Quiz attempts">
+                {attempts.map((attempt) => (
+                  <li key={attempt.attemptId} className="rounded-xl border border-soft p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
                         <p className="font-medium">
                           {attempt.student
                             ? `${attempt.student.firstName} ${attempt.student.lastName}`
                             : "Deleted user"}
                         </p>
-                        <p className="text-xs text-muted">
+                        <p className="text-sm break-all text-muted">
                           {attempt.student?.email ?? "—"}
                         </p>
-                      </td>
-                      <td className="py-3 pr-4">{attempt.quizTitle || "—"}</td>
-                      <td className="py-3 pr-4 tabular-nums">
+                      </div>
+                      <Badge variant={attempt.passed ? "success" : "muted"}>
+                        {attempt.passed ? "Passed" : "Failed"}
+                      </Badge>
+                    </div>
+
+                    <p className="mt-3 text-sm font-medium">{attempt.quizTitle || "—"}</p>
+
+                    <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="tabular-nums">
                         {attempt.score}/{attempt.totalPoints}{" "}
                         <span className="text-muted">({attempt.percentage}%)</span>
-                      </td>
-                      <td className="py-3 pr-4">
-                        <Badge variant={attempt.passed ? "success" : "muted"}>
-                          {attempt.passed ? "Passed" : "Failed"}
-                        </Badge>
-                      </td>
-                      <td className="py-3 text-muted">
+                      </span>
+                      <span className="text-xs text-muted">
                         {new Date(attempt.submittedAt).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
 
           {pagination && pagination.totalPages > 1 && (

@@ -15,9 +15,12 @@ export interface AttentionItem {
 export const AttentionPanel = ({
   items,
   isLoading,
+  emptyNote = "No inactive accounts, drafts, or dropped enrollments.",
 }: {
   items: AttentionItem[];
   isLoading: boolean;
+  /** What "all clear" means here — the loose ends differ by role. */
+  emptyNote?: string;
 }) => (
   <Card className="flex h-full flex-col">
     <CardHeader>
@@ -41,9 +44,7 @@ export const AttentionPanel = ({
           </span>
           <div>
             <p className="font-medium">All clear</p>
-            <p className="mt-1 text-sm text-muted">
-              No inactive accounts, drafts, or dropped enrollments.
-            </p>
+            <p className="mt-1 text-sm text-muted">{emptyNote}</p>
           </div>
         </div>
       )}
@@ -57,7 +58,7 @@ export const AttentionPanel = ({
                 className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 transition-colors hover:border-soft hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 <span className="shrink-0 rounded-lg bg-amber/15 p-2">
-                  <Icon className="size-4 text-[#8a5a12]" aria-hidden={true} />
+                  <Icon className="size-4 text-amber-strong" aria-hidden={true} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{label}</span>

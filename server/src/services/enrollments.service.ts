@@ -14,6 +14,7 @@ import {
   AllEnrollmentsQuery,
   EnrollmentListQuery,
 } from "../validators/enrollments.validators";
+import { escapeRegex } from "../utils/escapeRegex";
 
 export interface EnrollmentCourseInfo {
   id: string;
@@ -50,9 +51,6 @@ export interface EnrollmentStatistics {
   completedEnrollments: number;
   cancelledEnrollments: number;
 }
-
-const escapeRegex = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const isPopulated = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !(value instanceof Types.ObjectId);

@@ -11,6 +11,7 @@ import {
   createLessonSchema,
   reorderLessonsSchema,
   updateLessonSchema,
+  bulkLessonStatusSchema,
 } from "../validators/lessons.validators";
 import { publishStatusSchema } from "../validators/modules.validators";
 
@@ -25,6 +26,12 @@ moduleLessonsRouter.post(
   ...staffOnly,
   validate(createLessonSchema),
   lessonsController.createLesson
+);
+moduleLessonsRouter.patch(
+  "/bulk-status",
+  ...staffOnly,
+  validate(bulkLessonStatusSchema),
+  lessonsController.bulkSetLessonStatus
 );
 moduleLessonsRouter.patch(
   "/reorder",

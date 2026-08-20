@@ -8,9 +8,13 @@ const badgeVariants = cva(
     variants: {
       variant: {
         primary: "bg-primary-soft text-primary-strong",
-        amber: "bg-amber/15 text-[#8a5a12]",
-        aubergine: "bg-aubergine/10 text-aubergine",
+        amber: "bg-amber/15 text-amber-strong",
+        aubergine: "bg-aubergine/10 text-aubergine-strong",
         success: "bg-success-soft text-success",
+        // Destructive outcomes. Uses the palette's existing danger pair, the
+        // same way `success` uses its own — an irreversible action must not read
+        // like an ordinary edit.
+        danger: "bg-danger-soft text-danger",
         muted: "bg-soft text-muted",
       },
     },

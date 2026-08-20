@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthContext } from "@/context/AuthContext";
@@ -128,11 +128,17 @@ describe("AdminEnrollmentsPage", () => {
 
     renderWithProviders(<AdminEnrollmentsPage />, { authUser: makeAdmin() });
 
-    expect(await screen.findByText("Seen Student")).toBeInTheDocument();
-    expect(screen.getByText("seen@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Admin Visible Course")).toBeInTheDocument();
-    // "Active" also appears as a filter option — the badge makes it plural.
-    expect(screen.getAllByText("Active").length).toBeGreaterThan(1);
+    // The responsive layout renders a table and a card list; both exist in
+    // jsdom, so row assertions are scoped to the table.
+    const table = await screen.findByRole("table");
+    expect(within(table).getByText("Seen Student")).toBeInTheDocument();
+    expect(within(table).getByText("seen@example.com")).toBeInTheDocument();
+    expect(within(table).getByText("Admin Visible Course")).toBeInTheDocument();
+    expect(within(table).getByText("Active")).toBeInTheDocument();
+
+    // The same enrollment is reachable on a phone, without a sideways drag.
+    const cards = screen.getByRole("list", { name: "Enrollments" });
+    expect(within(cards).getByText("Seen Student")).toBeInTheDocument();
   });
 
   it("shows the empty state", async () => {

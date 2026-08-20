@@ -13,6 +13,9 @@ vi.mock("@/services/users.service", () => ({
     create: vi.fn(),
     update: vi.fn(),
     setStatus: vi.fn(),
+    resetPassword: vi.fn(),
+    bulkSetStatus: vi.fn(),
+    bulkRemove: vi.fn(),
     remove: vi.fn(),
     statistics: vi.fn(),
     recent: vi.fn(),
@@ -232,5 +235,309 @@ describe("UsersPage", () => {
       });
     });
     expect(await screen.findByText("User created")).toBeInTheDocument();
+  });
+});
+
+/**
+ * The table and the card list are both mounted under jsdom, so a per-row
+ * control matches twice — the card list gained checkboxes so that bulk actions
+ * are reachable on a phone at all, where previously nothing was selectable.
+ */
+describe("UsersPage bulk actions", () => {
+  /** The signed-in admin defaults to an id that is not among the listed rows. */
+  const renderPage = (self: { id: string } = { id: "admin-only" }) =>
+    renderWithProviders(<UsersPage />, { authUser: makeAdmin({ id: self.id }) });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedService.list.mockResolvedValue(
+      listResult([
+        makeUser({ id: "u-1", firstName: "Ada", lastName: "One" }),
+        makeUser({ id: "u-2", firstName: "Bob", lastName: "Two" }),
+      ])
+    );
+  });
+
+  it("shows no bulk bar until something is selected", async () => {
+    renderPage();
+    await screen.findByRole("table");
+
+    expect(screen.queryByRole("group", { name: "Bulk actions" })).not.toBeInTheDocument();
+  });
+
+  it("selects rows and reports the count", async () => {
+    renderPage();
+    await screen.findByRole("table");
+
+    await userEvent.click(screen.getAllByLabelText("Select Ada One")[0]);
+    const bar = screen.getByRole("group", { name: "Bulk actions" });
+    expect(within(bar).getByText("1 selected")).toBeInTheDocument();
+
+    await userEvent.click(screen.getAllByLabelText("Select Bob Two")[0]);
+    expect(within(bar).getByText("2 selected")).toBeInTheDocument();
+
+    await userEvent.click(within(bar).getByRole("button", { name: "Clear" }));
+    expect(screen.queryByRole("group", { name: "Bulk actions" })).not.toBeInTheDocument();
+  });
+
+  it("selects and clears every row from the header checkbox", async () => {
+    renderPage();
+    await screen.findByRole("table");
+
+    const all = screen.getByLabelText("Select all users on this page");
+    await userEvent.click(all);
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
+
+    await userEvent.click(all);
+    expect(screen.queryByRole("group", { name: "Bulk actions" })).not.toBeInTheDocument();
+  });
+
+  it("deactivates the selection after confirmation", async () => {
+    mockedService.bulkSetStatus.mockResolvedValue({ requested: 2, affected: 2 });
+    renderPage();
+    await screen.findByRole("table");
+
+    await userEvent.click(screen.getByLabelText("Select all users on this page"));
+    await userEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Deactivate 2 users")).toBeInTheDocument();
+    expect(within(dialog).getByText(/courses and progress are kept/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Deactivate" }));
+
+    await waitFor(() => {
+      expect(mockedService.bulkSetStatus).toHaveBeenCalledWith(["u-1", "u-2"], false);
+    });
+    expect(await screen.findByText("2 accounts updated")).toBeInTheDocument();
+  });
+
+  it("warns that a bulk delete cannot be undone", async () => {
+    mockedService.bulkRemove.mockResolvedValue({ requested: 1, affected: 1 });
+    renderPage();
+    await screen.findByRole("table");
+
+    await userEvent.click(screen.getAllByLabelText("Select Ada One")[0]);
+    // Scoped to the bulk bar — each row has its own Delete action too.
+    const bar = screen.getByRole("group", { name: "Bulk actions" });
+    await userEvent.click(within(bar).getByRole("button", { name: /Delete/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/cannot be undone/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(mockedService.bulkRemove).toHaveBeenCalledWith(["u-1"]);
+    });
+  });
+
+  it("says so when part of the selection no longer exists", async () => {
+    mockedService.bulkSetStatus.mockResolvedValue({ requested: 2, affected: 1 });
+    renderPage();
+    await screen.findByRole("table");
+
+    await userEvent.click(screen.getByLabelText("Select all users on this page"));
+    await userEvent.click(screen.getByRole("button", { name: "Activate" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Activate" }));
+
+    expect(
+      await screen.findByText("1 of 2 updated — the rest no longer exist")
+    ).toBeInTheDocument();
+  });
+
+  it("never offers your own account for selection", async () => {
+    // The signed-in admin is one of the rows on this page.
+    mockedService.list.mockResolvedValue(
+      listResult([
+        makeUser({ id: "admin-1", firstName: "Me", lastName: "Myself", role: "admin" }),
+        makeUser({ id: "u-2", firstName: "Bob", lastName: "Two" }),
+      ])
+    );
+
+    renderPage({ id: "admin-1" });
+    await screen.findByRole("table");
+
+    // Neither the table nor the card list offers a tick for your own row.
+    expect(screen.queryAllByLabelText("Select Me Myself")).toHaveLength(0);
+    expect(screen.getAllByLabelText("Select Bob Two").length).toBeGreaterThan(0);
+
+    // "Select all" therefore covers everyone but you.
+    await userEvent.click(screen.getByLabelText("Select all users on this page"));
+    expect(screen.getByText("1 selected")).toBeInTheDocument();
+  });
+});
+
+describe("UsersPage sorting, counts and view state", () => {
+  const admin = makeAdmin({ id: "admin-1" });
+
+  const stats = {
+    totalUsers: 47,
+    students: 38,
+    instructors: 7,
+    admins: 2,
+    activeUsers: 44,
+    inactiveUsers: 3,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedService.list.mockResolvedValue(listResult([makeUser({ firstName: "Row" })]));
+    mockedService.statistics.mockResolvedValue(stats);
+  });
+
+  const renderAt = (url = "/admin/users") =>
+    renderWithProviders(<UsersPage />, { authUser: admin, initialEntries: [url] });
+
+  it("asks for newest-first by default, which the server used to decide alone", async () => {
+    renderAt();
+    await screen.findAllByText(/Row/);
+
+    expect(mockedService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ sortBy: "createdAt", sortOrder: "desc" })
+    );
+  });
+
+  it("sorts a column ascending on first click and flips it on the second", async () => {
+    renderAt();
+    await screen.findAllByText(/Row/);
+
+    const nameHeader = screen.getByRole("button", { name: "Name" });
+
+    await userEvent.click(nameHeader);
+    await waitFor(() =>
+      expect(mockedService.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sortBy: "firstName", sortOrder: "asc" })
+      )
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Name" }));
+    await waitFor(() =>
+      expect(mockedService.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sortBy: "firstName", sortOrder: "desc" })
+      )
+    );
+  });
+
+  it("exposes the sorted column to assistive technology", async () => {
+    renderAt("/admin/users?sortBy=email&sortOrder=asc");
+    await screen.findAllByText(/Row/);
+
+    const header = screen.getByRole("columnheader", { name: /Email/ });
+    expect(header).toHaveAttribute("aria-sort", "ascending");
+    // Only the active column is marked; the others must not claim an order.
+    expect(screen.getByRole("columnheader", { name: /Role/ })).toHaveAttribute(
+      "aria-sort",
+      "none"
+    );
+  });
+
+  it("turns the counts into the filters they describe", async () => {
+    renderAt();
+    await screen.findAllByText(/Row/);
+
+    const instructors = await screen.findByRole("button", { name: /7\s*Instructors/ });
+    expect(instructors).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(instructors);
+
+    await waitFor(() =>
+      expect(mockedService.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ role: "instructor" })
+      )
+    );
+    expect(
+      await screen.findByRole("button", { name: /7\s*Instructors/ })
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps the table when the counts fail to load", async () => {
+    mockedService.statistics.mockRejectedValue(new Error("stats down"));
+    renderAt();
+
+    expect((await screen.findAllByText(/Row/)).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /Instructors/ })).not.toBeInTheDocument();
+  });
+
+  it("lets an admin change how many rows a page holds", async () => {
+    renderAt();
+    await screen.findAllByText(/Row/);
+
+    await userEvent.selectOptions(screen.getByLabelText("Rows per page"), "50");
+
+    await waitFor(() =>
+      expect(mockedService.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ limit: 50, page: 1 })
+      )
+    );
+  });
+
+  it("restores the whole view from the URL", async () => {
+    renderAt(
+      "/admin/users?search=ada&role=instructor&status=inactive&sortBy=email&sortOrder=asc&limit=25&page=3"
+    );
+    await screen.findAllByText(/Row/);
+
+    expect(mockedService.list).toHaveBeenCalledWith({
+      page: 3,
+      limit: 25,
+      search: "ada",
+      role: "instructor",
+      status: "inactive",
+      sortBy: "email",
+      sortOrder: "asc",
+    });
+  });
+
+  it("discards URL values the server would reject", async () => {
+    renderAt("/admin/users?role=wizard&status=haunted&sortBy=password&limit=9999&page=0");
+    await screen.findAllByText(/Row/);
+
+    expect(mockedService.list).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: "",
+        status: "",
+        sortBy: "createdAt",
+        limit: 10,
+        page: 1,
+      })
+    );
+  });
+
+  it("offers a way out of a filtered-to-nothing list", async () => {
+    mockedService.list.mockResolvedValue(listResult([]));
+    renderAt("/admin/users?role=admin");
+
+    await screen.findByText("No users found.");
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    await waitFor(() =>
+      expect(mockedService.list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ role: "", status: "", search: "" })
+      )
+    );
+  });
+
+  it("shows no clear-filters escape hatch when nothing is filtered", async () => {
+    mockedService.list.mockResolvedValue(listResult([]));
+    renderAt();
+
+    await screen.findByText("No users found.");
+    expect(
+      screen.queryByRole("button", { name: "Clear filters" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("names the range on show, not just the page number", async () => {
+    mockedService.list.mockResolvedValue(
+      listResult([makeUser({ firstName: "Row" })], {
+        page: 2,
+        limit: 10,
+        total: 47,
+        totalPages: 5,
+      })
+    );
+    renderAt("/admin/users?page=2");
+
+    expect(await screen.findByText(/11–20 of 47 users/)).toBeInTheDocument();
   });
 });

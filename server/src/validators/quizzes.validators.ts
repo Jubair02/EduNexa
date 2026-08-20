@@ -167,3 +167,16 @@ export type CreateQuizInput = z.infer<typeof createQuizSchema>;
 export type UpdateQuizInput = z.infer<typeof updateQuizSchema>;
 export type SubmitQuizInput = z.infer<typeof submitQuizSchema>;
 export type AttemptsQuery = z.infer<typeof attemptsQuerySchema>;
+
+/** Pagination for the student's own quiz list. */
+export const myQuizzesQuerySchema = z.object({
+  page: z.coerce.number({ error: "page must be a number" }).int().min(1).default(1),
+  limit: z.coerce
+    .number({ error: "limit must be a number" })
+    .int()
+    .min(1)
+    .max(100)
+    .default(20),
+});
+
+export type MyQuizzesQuery = z.infer<typeof myQuizzesQuerySchema>;

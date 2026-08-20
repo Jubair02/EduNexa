@@ -3,6 +3,7 @@ import type {
   CourseProgress,
   LessonProgressState,
   MyCourseProgress,
+  Pagination,
   ProgressSummary,
 } from "@/types";
 import { api, unwrap } from "./api";
@@ -13,13 +14,6 @@ interface LessonProgressResponse {
 }
 
 export const progressService = {
-  /** Marks a lesson complete; returns the lesson state and fresh course totals. */
-  async completeLesson(lessonId: string): Promise<LessonProgressResponse> {
-    const res = await api.post<ApiResponse<LessonProgressResponse>>(
-      `/lessons/${lessonId}/complete`
-    );
-    return unwrap(res.data);
-  },
 
   async setLessonProgress(
     lessonId: string,
@@ -46,13 +40,31 @@ export const progressService = {
     return unwrap(res.data).progress;
   },
 
-  async myCourses(): Promise<{
+  /**
+   * The caller's enrolled courses. The rows are paged; the summary always
+   * describes the whole account, whichever page is asked for.
+   */
+  async myCourses(
+    params: { page: number; limit: number } = { page: 1, limit: 20 }
+  ): Promise<{
     courses: MyCourseProgress[];
     summary: ProgressSummary;
+    pagination: Pagination;
   }> {
     const res = await api.get<
       ApiResponse<{ courses: MyCourseProgress[]; summary: ProgressSummary }>
-    >("/progress/my-courses");
-    return unwrap(res.data);
+    >("/progress/my-courses", { params });
+    const { courses, summary } = unwrap(res.data);
+    return {
+      courses,
+      summary,
+      pagination:
+        res.data.pagination ?? {
+          page: params.page,
+          limit: params.limit,
+          total: courses.length,
+          totalPages: 1,
+        },
+    };
   },
 };

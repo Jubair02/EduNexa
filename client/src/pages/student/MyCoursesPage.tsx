@@ -34,6 +34,9 @@ export const MyCoursesPage = () => {
     limit: 9,
     search: "",
     status: "",
+    // Newest enrolment first — the server's existing default, now explicit.
+    sortBy: "enrolledAt",
+    sortOrder: "desc",
   });
   const [searchInput, setSearchInput] = useState("");
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);

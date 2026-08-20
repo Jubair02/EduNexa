@@ -128,6 +128,41 @@ export const AdminCertificatesPage = () => {
     }
   };
 
+  /** Shared by the desktop table and the mobile cards. */
+  const rowActions = (certificate: Certificate) => (
+    <div className="flex items-center gap-1">
+      <Link
+        to={`/verify/certificate/${certificate.verificationCode}`}
+        aria-label={`View ${certificate.certificateNumber}`}
+        className="rounded-lg p-2 text-muted transition-colors hover:bg-primary-soft hover:text-ink"
+      >
+        <Eye className="size-4" aria-hidden="true" />
+      </Link>
+      <button
+        type="button"
+        onClick={() => void download(certificate)}
+        aria-label={`Download ${certificate.certificateNumber}`}
+        className="rounded-lg p-2 text-muted transition-colors hover:bg-primary-soft hover:text-ink"
+      >
+        <Download className="size-4" aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setPendingChange(certificate)}
+        aria-label={`${
+          certificate.status === "active" ? "Revoke" : "Restore"
+        } ${certificate.certificateNumber}`}
+        className="rounded-lg p-2 text-muted transition-colors hover:bg-danger-soft hover:text-danger"
+      >
+        {certificate.status === "active" ? (
+          <ShieldOff className="size-4" aria-hidden="true" />
+        ) : (
+          <RotateCcw className="size-4" aria-hidden="true" />
+        )}
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -215,79 +250,81 @@ export const AdminCertificatesPage = () => {
           )}
 
           {status === "ready" && certificates.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-soft text-xs text-muted uppercase">
-                    <th className="py-2 pr-4 font-medium">Certificate</th>
-                    <th className="py-2 pr-4 font-medium">Student</th>
-                    <th className="py-2 pr-4 font-medium">Course</th>
-                    <th className="py-2 pr-4 font-medium">Issued</th>
-                    <th className="py-2 pr-4 font-medium">Status</th>
-                    <th className="py-2 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {certificates.map((certificate) => (
-                    <tr key={certificate.id} className="border-b border-soft last:border-0">
-                      <td className="py-3 pr-4 font-mono text-xs">
-                        {certificate.certificateNumber}
-                      </td>
-                      <td className="py-3 pr-4">
+            <>
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-soft text-xs text-muted uppercase">
+                      <th className="py-2 pr-4 font-medium">Certificate</th>
+                      <th className="py-2 pr-4 font-medium">Student</th>
+                      <th className="py-2 pr-4 font-medium">Course</th>
+                      <th className="py-2 pr-4 font-medium">Issued</th>
+                      <th className="py-2 pr-4 font-medium">Status</th>
+                      <th className="py-2 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {certificates.map((certificate) => (
+                      <tr key={certificate.id} className="border-b border-soft last:border-0">
+                        <td className="py-3 pr-4 font-mono text-xs">
+                          {certificate.certificateNumber}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <p className="font-medium">{certificate.studentName}</p>
+                          <p className="text-xs text-muted">
+                            {certificate.student?.email ?? "—"}
+                          </p>
+                        </td>
+                        <td className="py-3 pr-4">{certificate.courseTitle}</td>
+                        <td className="py-3 pr-4 text-muted">
+                          {new Date(certificate.issuedAt).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <Badge
+                            variant={certificate.status === "active" ? "success" : "muted"}
+                          >
+                            {certificate.status === "active" ? "Active" : "Revoked"}
+                          </Badge>
+                        </td>
+                        <td className="py-3">{rowActions(certificate)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards — a six-column table is a sideways drag on a phone. */}
+              <ul className="space-y-3 md:hidden" aria-label="Certificates">
+                {certificates.map((certificate) => (
+                  <li key={certificate.id} className="rounded-xl border border-soft p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
                         <p className="font-medium">{certificate.studentName}</p>
-                        <p className="text-xs text-muted">
+                        <p className="text-sm break-all text-muted">
                           {certificate.student?.email ?? "—"}
                         </p>
-                      </td>
-                      <td className="py-3 pr-4">{certificate.courseTitle}</td>
-                      <td className="py-3 pr-4 text-muted">
-                        {new Date(certificate.issuedAt).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 pr-4">
-                        <Badge
-                          variant={certificate.status === "active" ? "success" : "muted"}
-                        >
-                          {certificate.status === "active" ? "Active" : "Revoked"}
-                        </Badge>
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center gap-1">
-                          <Link
-                            to={`/verify/certificate/${certificate.verificationCode}`}
-                            aria-label={`View ${certificate.certificateNumber}`}
-                            className="rounded-lg p-2 text-muted transition-colors hover:bg-primary-soft hover:text-ink"
-                          >
-                            <Eye className="size-4" aria-hidden="true" />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => void download(certificate)}
-                            aria-label={`Download ${certificate.certificateNumber}`}
-                            className="rounded-lg p-2 text-muted transition-colors hover:bg-primary-soft hover:text-ink"
-                          >
-                            <Download className="size-4" aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPendingChange(certificate)}
-                            aria-label={`${
-                              certificate.status === "active" ? "Revoke" : "Restore"
-                            } ${certificate.certificateNumber}`}
-                            className="rounded-lg p-2 text-muted transition-colors hover:bg-danger-soft hover:text-danger"
-                          >
-                            {certificate.status === "active" ? (
-                              <ShieldOff className="size-4" aria-hidden="true" />
-                            ) : (
-                              <RotateCcw className="size-4" aria-hidden="true" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                      <Badge variant={certificate.status === "active" ? "success" : "muted"}>
+                        {certificate.status === "active" ? "Active" : "Revoked"}
+                      </Badge>
+                    </div>
+
+                    <p className="mt-3 text-sm font-medium">{certificate.courseTitle}</p>
+                    <p className="mt-1 font-mono text-xs text-muted">
+                      {certificate.certificateNumber}
+                    </p>
+
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted">
+                        Issued {new Date(certificate.issuedAt).toLocaleDateString()}
+                      </span>
+                      {rowActions(certificate)}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
 
           {pagination && pagination.totalPages > 1 && (

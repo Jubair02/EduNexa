@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { LessonType } from "../models/lesson.model";
+import { isSafeHttpUrl } from "../utils/safeUrl";
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
 
@@ -25,11 +26,24 @@ const contentSchema = z
   .max(50000, "Content cannot exceed 50000 characters")
   .optional();
 
+/**
+ * An http(s) URL, or an empty string to clear the field.
+ *
+ * `z.url()` alone accepts `javascript:` and `data:` URLs, which the client
+ * renders into an anchor href and an iframe src — stored XSS. The scheme check
+ * is what makes this safe, so it must stay.
+ */
 const urlSchema = (label: string) =>
   z
-    .union([z.url({ error: `${label} must be a valid URL` }), z.literal("")], {
-      error: `${label} must be a valid URL`,
-    })
+    .union(
+      [
+        z
+          .url({ error: `${label} must be a valid URL` })
+          .refine(isSafeHttpUrl, `${label} must start with http:// or https://`),
+        z.literal(""),
+      ],
+      { error: `${label} must be a valid URL` }
+    )
     .optional();
 
 const durationSchema = z
@@ -82,3 +96,17 @@ export const reorderLessonsSchema = z.object({
 
 export type CreateLessonInput = z.infer<typeof createLessonSchema>;
 export type UpdateLessonInput = z.infer<typeof updateLessonSchema>;
+
+/** Bulk publish/unpublish within one module. Capped and de-duplicated. */
+export const bulkLessonStatusSchema = z.object({
+  lessonIds: z
+    .array(z.string().regex(OBJECT_ID_PATTERN, "Each id must be a valid lesson id"), {
+      error: "lessonIds must be an array of lesson ids",
+    })
+    .min(1, "Select at least one lesson")
+    .max(100, "Select at most 100 lessons at a time")
+    .transform((ids) => [...new Set(ids)]),
+  isPublished: z.boolean({ error: "isPublished must be true or false" }),
+});
+
+export type BulkLessonStatusInput = z.infer<typeof bulkLessonStatusSchema>;

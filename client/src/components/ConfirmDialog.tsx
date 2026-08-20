@@ -30,7 +30,7 @@ export const ConfirmDialog = ({
       <Button
         onClick={onConfirm}
         isLoading={isLoading}
-        className="bg-danger hover:bg-[#8f1e18]"
+        className="bg-danger hover:bg-danger-strong"
       >
         {confirmLabel}
       </Button>

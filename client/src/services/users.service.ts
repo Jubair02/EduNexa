@@ -1,5 +1,6 @@
 import type {
   ApiResponse,
+  BulkResult,
   CreateUserPayload,
   UpdateUserPayload,
   User,
@@ -14,6 +15,10 @@ export const usersService = {
     const query: Record<string, string | number> = {
       page: params.page,
       limit: params.limit,
+      // The server has always accepted these; nothing was sending them until
+      // the table grew sortable column headers.
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
     };
     if (params.search.trim()) query.search = params.search.trim();
     if (params.role) query.role = params.role;
@@ -52,6 +57,31 @@ export const usersService = {
       isActive,
     });
     return unwrap(res.data).user;
+  },
+
+  /** Admin-issued password reset — the recovery path for a locked-out account. */
+  async resetPassword(id: string, password: string): Promise<User> {
+    const res = await api.patch<ApiResponse<{ user: User }>>(`/users/${id}/password`, {
+      password,
+    });
+    return unwrap(res.data).user;
+  },
+
+  /** Activate or deactivate several accounts in one request. */
+  async bulkSetStatus(userIds: string[], isActive: boolean): Promise<BulkResult> {
+    const res = await api.patch<ApiResponse<BulkResult>>("/users/bulk-status", {
+      userIds,
+      isActive,
+    });
+    return unwrap(res.data);
+  },
+
+  /** Delete several accounts in one request. */
+  async bulkRemove(userIds: string[]): Promise<BulkResult> {
+    const res = await api.post<ApiResponse<BulkResult>>("/users/bulk-delete", {
+      userIds,
+    });
+    return unwrap(res.data);
   },
 
   async remove(id: string): Promise<void> {

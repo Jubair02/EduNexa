@@ -48,6 +48,18 @@ export interface RegisterPayload {
   password: string;
 }
 
+/** Self-service profile edit — deliberately no role or status. */
+export interface UpdateProfilePayload {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface UserStatistics {
   totalUsers: number;
   students: number;
@@ -60,12 +72,18 @@ export interface UserStatistics {
 export type StatusFilter = "" | "active" | "inactive";
 export type RoleFilter = "" | UserRole;
 
+/** The columns the server will sort on — anything else it rejects. */
+export type UserSortField = "createdAt" | "firstName" | "lastName" | "email" | "role";
+export type SortOrder = "asc" | "desc";
+
 export interface UserListParams {
   page: number;
   limit: number;
   search: string;
   role: RoleFilter;
   status: StatusFilter;
+  sortBy: UserSortField;
+  sortOrder: SortOrder;
 }
 
 export interface UserListResult {
@@ -275,12 +293,17 @@ export interface EnrollmentCheck {
   status: EnrollmentStatus | null;
 }
 
+/** The columns the server will sort enrollments on — anything else it rejects. */
+export type EnrollmentSortField = "enrolledAt" | "lastAccessedAt" | "status";
+
 export interface EnrollmentListParams {
   page: number;
   limit: number;
   search: string;
   status: "" | EnrollmentStatus;
   course?: string;
+  sortBy: EnrollmentSortField;
+  sortOrder: SortOrder;
 }
 
 export interface EnrollmentListResult {
@@ -515,4 +538,173 @@ export interface LessonPayload {
   filePublicId?: string;
   duration?: number | null;
   isPreview?: boolean;
+}
+
+// ---- Teaching overview (instructor dashboard) ----
+
+export interface TeachingCourseRow {
+  courseId: string;
+  title: string;
+  slug: string;
+  status: CourseStatus;
+  publishedLessons: number;
+  requiredQuizzes: number;
+  /** Active + completed enrollments; cancelled are excluded. */
+  students: number;
+  completions: number;
+  completionRate: number;
+  averageProgress: number;
+  certificatesIssued: number;
+}
+
+export interface NudgeRow {
+  enrollmentId: string;
+  studentName: string;
+  courseId: string;
+  courseTitle: string;
+  progressPercentage: number;
+  enrolledAt: string;
+  lastAccessedAt?: string;
+}
+
+export interface TeachingOverview {
+  courses: { total: number; published: number; draft: number; archived: number };
+  students: { total: number; active: number; completed: number; cancelled: number };
+  engagement: {
+    averageProgress: number;
+    completions: number;
+    completionRate: number;
+    certificatesIssued: number;
+  };
+  quizzes: {
+    published: number;
+    attempts: number;
+    averageScore: number | null;
+    passRate: number | null;
+  };
+  courseBreakdown: TeachingCourseRow[];
+  nudges: NudgeRow[];
+}
+
+export interface TeachingStudentRow {
+  enrollmentId: string;
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  courseId: string;
+  courseTitle: string;
+  status: EnrollmentStatus;
+  progressPercentage: number;
+  completedLessons: number;
+  totalLessons: number;
+  passedRequiredQuizzes: number;
+  totalRequiredQuizzes: number;
+  enrolledAt: string;
+  lastAccessedAt?: string;
+  completedAt?: string;
+  certificateIssued: boolean;
+}
+
+export interface TeachingStudentsParams {
+  page: number;
+  limit: number;
+  search: string;
+  course: string;
+  status: "" | EnrollmentStatus;
+  sortBy: "name" | "progress" | "enrolledAt" | "lastAccessedAt";
+  sortOrder: "asc" | "desc";
+}
+
+export interface TeachingStudentsResult {
+  students: TeachingStudentRow[];
+  pagination: Pagination;
+}
+
+/** Result of a bulk write — `affected` is what existed and now matches. */
+export interface BulkResult {
+  requested: number;
+  affected: number;
+}
+
+// ---- Notifications ----
+
+export type NotificationKind =
+  | "certificate-earned"
+  | "quiz-result"
+  | "course-completed"
+  | "new-enrollment"
+  | "student-completed"
+  | "certificate-issued"
+  | "new-user";
+
+export interface NotificationItem {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  at: string;
+  to?: string;
+  isUnread: boolean;
+}
+
+export interface NotificationFeed {
+  notifications: NotificationItem[];
+  unreadCount: number;
+}
+
+// ---- Audit log ----
+
+/**
+ * Mirrors the server's `AuditAction`. These strings are stored on every entry,
+ * so they are a stable contract rather than display text — the label shown in
+ * the UI is looked up from them.
+ */
+export type AuditAction =
+  | "user.created"
+  | "user.updated"
+  | "user.role_changed"
+  | "user.status_changed"
+  | "user.password_reset"
+  | "user.deleted"
+  | "users.bulk_status_changed"
+  | "users.bulk_deleted"
+  | "certificate.status_changed"
+  | "course.deleted";
+
+export type AuditTargetType = "user" | "users" | "course" | "certificate";
+
+export interface AuditChange {
+  field: string;
+  from: string;
+  to: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: AuditAction;
+  summary: string;
+  /** `id` is null once the account is gone; the name and email always resolve. */
+  actor: { id: string | null; name: string; email: string; role: UserRole };
+  target: { type: AuditTargetType; id: string | null; label: string };
+  changes: AuditChange[];
+  metadata: Record<string, unknown>;
+  ip: string;
+  userAgent: string;
+  createdAt: string;
+}
+
+export interface AuditListParams {
+  page: number;
+  limit: number;
+  search: string;
+  action: "" | AuditAction;
+  /** Date-only strings ("2026-08-20"); the server reads `to` as a whole day. */
+  from: string;
+  to: string;
+}
+
+export interface AuditListResult {
+  logs: AuditLogEntry[];
+  pagination: Pagination;
 }

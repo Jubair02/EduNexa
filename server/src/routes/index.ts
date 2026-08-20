@@ -1,4 +1,5 @@
 import { Router } from "express";
+import auditRoutes from "./audit.routes";
 import authRoutes from "./auth.routes";
 import {
   certificatesRouter,
@@ -18,6 +19,8 @@ import {
   quizAttemptsRouter,
   quizzesRouter,
 } from "./quizzes.routes";
+import notificationsRoutes from "./notifications.routes";
+import teachingRoutes from "./teaching.routes";
 import uploadsRoutes from "./uploads.routes";
 import usersRoutes from "./users.routes";
 
@@ -29,6 +32,7 @@ router.get("/health", (_req, res) => {
 
 router.use("/auth", authRoutes);
 router.use("/users", usersRoutes);
+router.use("/audit-logs", auditRoutes);
 // Nested content routes are mounted before their parent resources so the
 // more specific paths match first.
 router.use("/courses/:courseId/modules", courseModulesRouter);
@@ -46,6 +50,8 @@ router.use("/quizzes", quizzesRouter);
 router.use("/quiz-attempts", quizAttemptsRouter);
 router.use("/certificates", certificatesRouter);
 router.use("/courses", coursesRoutes);
+router.use("/notifications", notificationsRoutes);
+router.use("/teaching", teachingRoutes);
 router.use("/uploads", uploadsRoutes);
 
 export default router;

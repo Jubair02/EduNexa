@@ -43,9 +43,23 @@ export const quizzesService = {
   },
 
   /** Every quiz across the student's courses, with their own results. */
-  async myQuizzes(): Promise<StudentQuizOverview[]> {
-    const res = await api.get<ApiResponse<StudentQuizOverview[]>>("/quizzes/my-quizzes");
-    return res.data.data ?? [];
+  async myQuizzes(
+    params: { page: number; limit: number } = { page: 1, limit: 20 }
+  ): Promise<{ quizzes: StudentQuizOverview[]; pagination: Pagination }> {
+    const res = await api.get<ApiResponse<StudentQuizOverview[]>>("/quizzes/my-quizzes", {
+      params,
+    });
+    const quizzes = res.data.data ?? [];
+    return {
+      quizzes,
+      pagination:
+        res.data.pagination ?? {
+          page: params.page,
+          limit: params.limit,
+          total: quizzes.length,
+          totalPages: 1,
+        },
+    };
   },
 
   async create(courseId: string, payload: QuizPayload): Promise<Quiz> {

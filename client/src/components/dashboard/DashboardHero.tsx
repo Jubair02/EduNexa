@@ -1,5 +1,5 @@
-import { Plus, RefreshCw, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/utils/cn";
 
@@ -10,13 +10,27 @@ const today = (): string =>
     month: "long",
   });
 
+/**
+ * Shared dashboard header. The wording and the primary actions differ by role,
+ * so both are supplied by the page — an instructor must never be offered
+ * "Manage users", which their role cannot do.
+ */
 export const DashboardHero = ({
   firstName,
+  eyebrow,
+  subtitle,
+  actions,
   updatedAt,
   isRefreshing,
   onRefresh,
 }: {
   firstName: string;
+  /** Small caps label above the greeting, e.g. "Admin overview". */
+  eyebrow: string;
+  subtitle: string;
+  /** Role-appropriate primary actions. */
+  actions?: ReactNode;
+  /** Already formatted for display, e.g. "14:40". */
   updatedAt: string | null;
   isRefreshing: boolean;
   onRefresh: () => void;
@@ -35,38 +49,21 @@ export const DashboardHero = ({
     <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-x-2 text-xs font-semibold tracking-wide text-white/60 uppercase">
-          <span>Admin overview</span>
+          <span>{eyebrow}</span>
           <span aria-hidden="true">•</span>
           <span className="normal-case">{today()}</span>
         </p>
         <h1 className="mt-2 font-display text-3xl font-semibold sm:text-4xl">
           Welcome, {firstName}
         </h1>
-        <p className="mt-2 max-w-xl text-sm text-white/70 sm:text-base">
-          Here's what's happening on EduNexa.
-        </p>
+        <p className="mt-2 max-w-xl text-sm text-white/70 sm:text-base">{subtitle}</p>
       </div>
 
       <div className="flex flex-col gap-3 sm:items-end">
         {/* Comfortable 44px targets on touch, tighter on desktop. */}
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <Link to="/admin/courses/new" className="flex-1 sm:flex-none">
-            <Button size="sm" className="h-11 w-full whitespace-nowrap sm:h-9">
-              <Plus className="size-4" aria-hidden="true" />
-              New course
-            </Button>
-          </Link>
-          <Link to="/admin/users" className="flex-1 sm:flex-none">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-11 w-full border border-white/25 bg-white/10 whitespace-nowrap text-white hover:bg-white/20 sm:h-9"
-            >
-              <Users className="size-4" aria-hidden="true" />
-              Manage users
-            </Button>
-          </Link>
-        </div>
+        {actions && (
+          <div className="flex w-full items-center gap-2 sm:w-auto">{actions}</div>
+        )}
 
         <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
           <Button

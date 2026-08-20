@@ -24,7 +24,6 @@ vi.mock("@/services/lessons.service", () => ({
 
 vi.mock("@/services/progress.service", () => ({
   progressService: {
-    completeLesson: vi.fn(),
     setLessonProgress: vi.fn(),
     getLessonProgress: vi.fn(),
     getCourseProgress: vi.fn(),

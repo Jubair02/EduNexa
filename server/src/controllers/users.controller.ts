@@ -1,20 +1,17 @@
 import { Request, Response } from "express";
 import * as usersService from "../services/users.service";
-import { ApiError } from "../utils/ApiError";
+import { param, requireActor } from "../utils/requestContext";
 import { ListUsersQuery } from "../validators/users.validators";
 
-const currentUserId = (req: Request): string => {
-  if (!req.user) {
-    throw ApiError.unauthorized();
-  }
-  return req.user._id.toString();
-};
-
-// Express 5 types route params as string | string[].
-const idParam = (req: Request): string => {
-  const { id } = req.params;
-  return Array.isArray(id) ? (id[0] ?? "") : id;
-};
+/**
+ * Every mutating handler here passes `requireActor(req)` rather than a bare
+ * user id: these are the actions the audit log exists to record, and the
+ * service writes the entry where it can see what actually changed.
+ *
+ * The ad-hoc `logger.warn` calls that used to sit in this file are gone — the
+ * audit service emits an operational line of its own alongside the durable
+ * entry, so tailing the output still shows sensitive actions as they happen.
+ */
 
 export const listUsers = async (_req: Request, res: Response): Promise<void> => {
   const query = res.locals.query as ListUsersQuery;
@@ -28,23 +25,31 @@ export const listUsers = async (_req: Request, res: Response): Promise<void> => 
 };
 
 export const getUser = async (req: Request, res: Response): Promise<void> => {
-  const user = await usersService.getUserById(idParam(req));
+  const user = await usersService.getUserById(param(req, "id"));
   res.status(200).json({ success: true, message: "User retrieved", data: { user } });
 };
 
 export const createUser = async (req: Request, res: Response): Promise<void> => {
-  const user = await usersService.createUser(req.body);
+  const user = await usersService.createUser(req.body, requireActor(req));
   res.status(201).json({ success: true, message: "User created", data: { user } });
 };
 
 export const updateUser = async (req: Request, res: Response): Promise<void> => {
-  const user = await usersService.updateUser(idParam(req), req.body, currentUserId(req));
+  const user = await usersService.updateUser(
+    param(req, "id"),
+    req.body,
+    requireActor(req)
+  );
   res.status(200).json({ success: true, message: "User updated", data: { user } });
 };
 
 export const setUserStatus = async (req: Request, res: Response): Promise<void> => {
   const { isActive } = req.body as { isActive: boolean };
-  const user = await usersService.setUserStatus(idParam(req), isActive, currentUserId(req));
+  const user = await usersService.setUserStatus(
+    param(req, "id"),
+    isActive,
+    requireActor(req)
+  );
   res.status(200).json({
     success: true,
     message: isActive ? "User activated" : "User deactivated",
@@ -53,7 +58,7 @@ export const setUserStatus = async (req: Request, res: Response): Promise<void> 
 };
 
 export const deleteUser = async (req: Request, res: Response): Promise<void> => {
-  await usersService.deleteUser(idParam(req), currentUserId(req));
+  await usersService.deleteUser(param(req, "id"), requireActor(req));
   res.status(200).json({ success: true, message: "User deleted" });
 };
 
@@ -65,4 +70,38 @@ export const getStatistics = async (_req: Request, res: Response): Promise<void>
 export const getRecentUsers = async (_req: Request, res: Response): Promise<void> => {
   const users = await usersService.getRecentUsers();
   res.status(200).json({ success: true, message: "Recent users retrieved", data: users });
+};
+
+export const resetUserPassword = async (req: Request, res: Response): Promise<void> => {
+  const user = await usersService.resetUserPassword(
+    param(req, "id"),
+    req.body,
+    requireActor(req)
+  );
+  res.status(200).json({
+    success: true,
+    message: "Password reset",
+    data: { user },
+  });
+};
+
+export const bulkSetUserStatus = async (req: Request, res: Response): Promise<void> => {
+  const { isActive } = req.body as { isActive: boolean };
+  const result = await usersService.bulkSetUserStatus(req.body, requireActor(req));
+  res.status(200).json({
+    success: true,
+    message: `${result.affected} account${result.affected === 1 ? "" : "s"} ${
+      isActive ? "activated" : "deactivated"
+    }`,
+    data: result,
+  });
+};
+
+export const bulkDeleteUsers = async (req: Request, res: Response): Promise<void> => {
+  const result = await usersService.bulkDeleteUsers(req.body, requireActor(req));
+  res.status(200).json({
+    success: true,
+    message: `${result.affected} account${result.affected === 1 ? "" : "s"} deleted`,
+    data: result,
+  });
 };

@@ -35,5 +35,38 @@ export const loginSchema = z.object({
   password: z.string({ error: "Password is required" }).min(1, "Password is required"),
 });
 
+/**
+ * Self-service profile edit. Deliberately limited to name and email — `role`
+ * and `isActive` are absent, so a user cannot promote or reactivate themselves
+ * by posting extra fields (Zod strips what it does not declare).
+ */
+export const updateProfileSchema = z
+  .object({
+    firstName: firstNameSchema.optional(),
+    lastName: lastNameSchema.optional(),
+    email: emailSchema.optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
+    message: "Provide at least one field to update",
+  });
+
+/**
+ * Self-service password change. The current password is required so a stolen
+ * token alone cannot lock the real owner out of their account.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string({ error: "Your current password is required" })
+      .min(1, "Your current password is required"),
+    newPassword: passwordSchema,
+  })
+  .refine((value) => value.currentPassword !== value.newPassword, {
+    path: ["newPassword"],
+    message: "Your new password must be different from the current one",
+  });
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

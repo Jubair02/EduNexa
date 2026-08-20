@@ -62,7 +62,6 @@ vi.mock("@/services/lessons.service", () => ({
 }));
 vi.mock("@/services/progress.service", () => ({
   progressService: {
-    completeLesson: vi.fn(),
     setLessonProgress: vi.fn(),
     getLessonProgress: vi.fn(),
     getCourseProgress: vi.fn(),
@@ -360,6 +359,7 @@ describe("StudentDashboard progress", () => {
         averageQuizScore: 82,
         quizzesAttempted: 4,
       },
+      pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
     });
 
     renderWithProviders(<StudentDashboard />, { authUser: student });
@@ -383,6 +383,7 @@ describe("StudentDashboard progress", () => {
         averageQuizScore: null,
         quizzesAttempted: 0,
       },
+      pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
     });
 
     renderWithProviders(<StudentDashboard />, { authUser: student });
@@ -408,6 +409,7 @@ describe("StudentDashboard progress", () => {
         averageQuizScore: null,
         quizzesAttempted: 0,
       },
+      pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
     });
     mockedEnrollments.myCourses.mockResolvedValue({
       enrollments: [

@@ -358,11 +358,18 @@ describe("QuizManagementPage", () => {
     );
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Seen Student")).toBeInTheDocument();
-    expect(within(dialog).getByText("seen@example.com")).toBeInTheDocument();
     expect(within(dialog).getByText("66%")).toBeInTheDocument();
     // "Passed" is both a summary label and the attempt's badge.
     expect(within(dialog).getAllByText("Passed").length).toBeGreaterThan(0);
+
+    // The attempt is listed in the table and, for narrow panels, as a card —
+    // both render in jsdom, so each is asserted on its own.
+    const table = within(dialog).getByRole("table");
+    expect(within(table).getByText("Seen Student")).toBeInTheDocument();
+    expect(within(table).getByText("seen@example.com")).toBeInTheDocument();
+
+    const cards = within(dialog).getByRole("list", { name: "Quiz attempts" });
+    expect(within(cards).getByText("Seen Student")).toBeInTheDocument();
   });
 });
 

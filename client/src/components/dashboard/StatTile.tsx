@@ -9,8 +9,8 @@ export type StatAccent = "primary" | "success" | "amber" | "aubergine";
 const accents: Record<StatAccent, { chip: string; bar: string }> = {
   primary: { chip: "bg-primary-soft text-primary", bar: "bg-primary" },
   success: { chip: "bg-success-soft text-success", bar: "bg-success" },
-  amber: { chip: "bg-amber/15 text-[#8a5a12]", bar: "bg-amber" },
-  aubergine: { chip: "bg-aubergine/10 text-aubergine", bar: "bg-aubergine" },
+  amber: { chip: "bg-amber/15 text-amber-strong", bar: "bg-amber" },
+  aubergine: { chip: "bg-aubergine/10 text-aubergine-strong", bar: "bg-aubergine" },
 };
 
 export interface StatTileProps {

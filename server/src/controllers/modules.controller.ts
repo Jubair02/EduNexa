@@ -1,24 +1,6 @@
 import { Request, Response } from "express";
-import { Viewer } from "../services/courses.service";
 import * as modulesService from "../services/modules.service";
-import { ApiError } from "../utils/ApiError";
-
-const viewerOrNull = (req: Request): Viewer | null =>
-  req.user ? { id: req.user._id.toString(), role: req.user.role } : null;
-
-const requireViewer = (req: Request): Viewer => {
-  const viewer = viewerOrNull(req);
-  if (!viewer) {
-    throw ApiError.unauthorized();
-  }
-  return viewer;
-};
-
-// Express 5 types route params as string | string[].
-const param = (req: Request, name: string): string => {
-  const value = req.params[name];
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-};
+import { param, requireViewer, viewerOrNull } from "../utils/requestContext";
 
 export const listModules = async (req: Request, res: Response): Promise<void> => {
   const modules = await modulesService.listModules(

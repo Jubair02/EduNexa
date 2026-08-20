@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as authService from "../services/auth.service";
 import { ApiError } from "../utils/ApiError";
+import { logger } from "../utils/logger";
 import { sanitizeUser } from "../utils/sanitizeUser";
 
 // Express 5 forwards rejected promises from async handlers to the error
@@ -45,4 +46,25 @@ export const logout = async (_req: Request, res: Response): Promise<void> => {
     success: true,
     message: "Logout successful",
   });
+};
+
+export const updateProfile = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    throw ApiError.unauthorized();
+  }
+  const user = await authService.updateOwnProfile(req.user, req.body);
+  res.status(200).json({
+    success: true,
+    message: "Profile updated",
+    data: { user },
+  });
+};
+
+export const changePassword = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    throw ApiError.unauthorized();
+  }
+  await authService.changeOwnPassword(req.user, req.body);
+  logger.info("account.password_changed", { userId: req.user._id.toString() });
+  res.status(200).json({ success: true, message: "Password changed" });
 };

@@ -178,7 +178,15 @@ export const StudentDashboard = () => {
     const [progressResult, enrollmentResult, catalogResult, certificateResult] =
       await Promise.allSettled([
         progressService.myCourses(),
-        enrollmentsService.myCourses({ page: 1, limit: 20, search: "", status: "" }),
+        enrollmentsService.myCourses({
+          page: 1,
+          limit: 20,
+          search: "",
+          status: "",
+          // The server's existing default, now stated rather than assumed.
+          sortBy: "enrolledAt",
+          sortOrder: "desc",
+        }),
         coursesService.list({
           page: 1,
           limit: 9,

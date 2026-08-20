@@ -6,6 +6,7 @@ import {
   GraduationCap,
   HelpCircle,
   LayoutDashboard,
+  ScrollText,
   Settings,
   TrendingUp,
   Users,
@@ -17,10 +18,11 @@ export interface NavItem {
   label: string;
   icon: ComponentType<{ className?: string }>;
   /**
-   * Destination route. Omitted for sections whose feature ships in a later
-   * phase — those render as disabled rows rather than links to nowhere.
+   * Destination route. Required on purpose: a nav row with nowhere to go reads
+   * as an unfinished product, so the type refuses to let one exist. Build the
+   * screen, or leave the entry out until it exists.
    */
-  to?: string;
+  to: string;
 }
 
 export interface RoleNav {
@@ -46,21 +48,22 @@ export const NAV_BY_ROLE: Record<UserRole, RoleNav> = {
       { label: "Certificates", icon: Award, to: "/student/certificates" },
     ],
     secondary: [
-      { label: "Settings", icon: Settings },
-      { label: "Help & Support", icon: HelpCircle },
+      { label: "Settings", icon: Settings, to: "/settings" },
+      { label: "Help & Support", icon: HelpCircle, to: "/help" },
     ],
   },
   instructor: {
     primary: [
       { label: "Dashboard", icon: LayoutDashboard, to: "/instructor/dashboard" },
       { label: "My Courses", icon: BookOpen, to: "/instructor/courses" },
+      { label: "My Students", icon: Users, to: "/instructor/students" },
       { label: "Browse Courses", icon: Compass, to: "/courses" },
       // Instructors manage quizzes and see completion figures inside each
       // course, so there is deliberately no global entry for either here.
     ],
     secondary: [
-      { label: "Settings", icon: Settings },
-      { label: "Help & Support", icon: HelpCircle },
+      { label: "Settings", icon: Settings, to: "/settings" },
+      { label: "Help & Support", icon: HelpCircle, to: "/help" },
     ],
   },
   admin: {
@@ -71,11 +74,12 @@ export const NAV_BY_ROLE: Record<UserRole, RoleNav> = {
       { label: "Enrollments", icon: GraduationCap, to: "/admin/enrollments" },
       { label: "Certificates", icon: Award, to: "/admin/certificates" },
       { label: "Quiz Attempts", icon: ClipboardList, to: "/admin/quiz-attempts" },
+      { label: "Audit Log", icon: ScrollText, to: "/admin/audit-log" },
       { label: "Browse Courses", icon: Compass, to: "/courses" },
     ],
     secondary: [
-      { label: "Settings", icon: Settings },
-      { label: "Help & Support", icon: HelpCircle },
+      { label: "Settings", icon: Settings, to: "/settings" },
+      { label: "Help & Support", icon: HelpCircle, to: "/help" },
     ],
   },
 };

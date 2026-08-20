@@ -1,9 +1,12 @@
 import { Router } from "express";
 import * as progressController from "../controllers/progress.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
-import { validate } from "../middleware/validate.middleware";
+import { validate, validateQuery } from "../middleware/validate.middleware";
 import { UserRole } from "../models/user.model";
-import { lessonProgressSchema } from "../validators/progress.validators";
+import {
+  lessonProgressSchema,
+  myCoursesProgressQuerySchema,
+} from "../validators/progress.validators";
 
 // Progress belongs to a student; the service also re-checks the role.
 const studentOnly = [authenticate, authorize(UserRole.STUDENT)];
@@ -35,5 +38,6 @@ export const progressRouter = Router();
 progressRouter.get(
   "/my-courses",
   ...studentOnly,
+  validateQuery(myCoursesProgressQuerySchema),
   progressController.getMyCoursesProgress
 );

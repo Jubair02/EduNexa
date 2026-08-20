@@ -12,14 +12,84 @@
   --color-primary-soft: #f7e6ec;
   --color-aubergine: #2a1e2f;
   --color-aubergine-light: #3d2c44;
+  /* Readable text weight for use on an aubergine tint. */
+  --color-aubergine-strong: #2a1e2f;
   --color-amber: #e8a33d;
   --color-success: #2e7d5b;
   --color-success-soft: #e4f2ec;
   --color-danger: #b3261e;
   --color-danger-soft: #fbeae9;
+  /* Readable text weights of amber and danger — previously inline hex. */
+  --color-amber-strong: #8a5a12;
+  --color-danger-strong: #8f1e18;
 
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/*
+ * Dark mode is done entirely on the token layer: the same semantic names are
+ * redefined, so components keep using `bg-surface` / `text-ink` and need no
+ * `dark:` classes at all. The light palette above is never modified.
+ *
+ * Three blocks, because there are three states. An explicit choice writes
+ * `data-theme` on <html> and must win in both directions; with nothing set, the
+ * operating system decides.
+ */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+
+      --color-paper: #171220;
+      --color-surface: #221a2b;
+      --color-ink: #f4eef3;
+      --color-muted: #a99db4;
+      --color-soft: #382d43;
+      /* Crimson has to lift on a dark ground to stay legible. */
+      --color-primary: #e8547a;
+      --color-primary-strong: #f4859f;
+      --color-primary-soft: #3a2030;
+      /* The hero keeps its deep ground, one step darker than the page. */
+      --color-aubergine: #120d18;
+      --color-aubergine-light: #2a2034;
+      --color-aubergine-strong: #cbb6d8;
+      --color-amber: #f0b45c;
+      --color-amber-strong: #f5c98a;
+      --color-success: #55b98a;
+      --color-success-soft: #1b3529;
+      --color-danger: #f0685f;
+      --color-danger-soft: #3b1f1d;
+      --color-danger-strong: #f79289;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-paper: #171220;
+    --color-surface: #221a2b;
+    --color-ink: #f4eef3;
+    --color-muted: #a99db4;
+    --color-soft: #382d43;
+    --color-primary: #e8547a;
+    --color-primary-strong: #f4859f;
+    --color-primary-soft: #3a2030;
+    --color-aubergine: #120d18;
+    --color-aubergine-light: #2a2034;
+    --color-aubergine-strong: #cbb6d8;
+    --color-amber: #f0b45c;
+    --color-amber-strong: #f5c98a;
+    --color-success: #55b98a;
+    --color-success-soft: #1b3529;
+    --color-danger: #f0685f;
+    --color-danger-soft: #3b1f1d;
+    --color-danger-strong: #f79289;
+  }
 }
 
 @keyframes rise-in {
@@ -49,5 +119,13 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /*
+     * Delay has to go too, not just duration. A staggered entry animation uses
+     * `both` fill mode, so a still-pending delay holds the element at its
+     * `from` state — leaving someone who asked for less motion staring at an
+     * empty grid for as long as the longest delay.
+     */
+    animation-delay: 0ms !important;
+    transition-delay: 0ms !important;
   }
 }

@@ -21,7 +21,11 @@ import { UserRole } from "../models/user.model";
 import { ApiError } from "../utils/ApiError";
 import { findAccessibleEnrollment } from "./course-access.service";
 import { Viewer } from "./courses.service";
-import { LessonProgressInput } from "../validators/progress.validators";
+import {
+  LessonProgressInput,
+  MyCoursesProgressQuery,
+} from "../validators/progress.validators";
+import { PaginationMeta } from "./users.service";
 
 export interface CourseProgress {
   courseId: string;
@@ -309,36 +313,180 @@ export const getCourseProgressFor = async (
   return getCourseProgress(course._id, viewer.id);
 };
 
-/** Every enrolled course with its progress, plus dashboard-level totals. */
+/**
+ * Whole-account progress totals, from aggregations rather than a walk.
+ *
+ * The summary has to describe every enrolled course, but computing
+ * `getCourseProgress` for each one is a query storm — seven queries per course,
+ * run in series. These few aggregations answer the same question for all of a
+ * student's courses at once, which is what lets the course *rows* be paginated
+ * without the summary going wrong.
+ */
+const summariseAllCourses = async (
+  studentId: string,
+  courseIds: Types.ObjectId[]
+): Promise<{
+  requiredItems: number;
+  completedItems: number;
+  completedCourses: number;
+}> => {
+  if (courseIds.length === 0) {
+    return { requiredItems: 0, completedItems: 0, completedCourses: 0 };
+  }
+
+  const publishedModules = await Module.find({
+    course: { $in: courseIds },
+    isPublished: true,
+  }).select("_id");
+  const publishedModuleIds = publishedModules.map((module) => module._id);
+
+  const [gradedLessons, requiredQuizzes] = await Promise.all([
+    Lesson.find({
+      course: { $in: courseIds },
+      module: { $in: publishedModuleIds },
+      isPublished: true,
+    }).select("_id course"),
+    Quiz.find({
+      course: { $in: courseIds },
+      isPublished: true,
+      isRequired: true,
+      $or: [
+        { module: { $in: publishedModuleIds } },
+        { module: { $exists: false } },
+        { module: null },
+      ],
+    }).select("_id course"),
+  ]);
+
+  /** Per course: how much there is to do, and how much is done. */
+  const perCourse = new Map<string, { required: number; done: number }>();
+  for (const id of courseIds) {
+    perCourse.set(id.toString(), { required: 0, done: 0 });
+  }
+  for (const lesson of gradedLessons) {
+    const row = perCourse.get(lesson.course.toString());
+    if (row) row.required += 1;
+  }
+  for (const quiz of requiredQuizzes) {
+    const row = perCourse.get(quiz.course.toString());
+    if (row) row.required += 1;
+  }
+
+  const [completedRows, passedRows] = await Promise.all([
+    LessonProgress.aggregate<{ _id: Types.ObjectId; n: number }>([
+      {
+        $match: {
+          student: new Types.ObjectId(studentId),
+          course: { $in: courseIds },
+          lesson: { $in: gradedLessons.map((lesson) => lesson._id) },
+          isCompleted: true,
+        },
+      },
+      { $group: { _id: "$course", n: { $sum: 1 } } },
+    ]),
+    QuizAttempt.aggregate<{ _id: Types.ObjectId; n: number }>([
+      {
+        $match: {
+          student: new Types.ObjectId(studentId),
+          course: { $in: courseIds },
+          quiz: { $in: requiredQuizzes.map((quiz) => quiz._id) },
+          passed: true,
+        },
+      },
+      { $group: { _id: "$course", quizzes: { $addToSet: "$quiz" } } },
+      { $project: { n: { $size: "$quizzes" } } },
+    ]),
+  ]);
+
+  for (const row of completedRows) {
+    const entry = perCourse.get(row._id.toString());
+    if (entry) entry.done += row.n;
+  }
+  for (const row of passedRows) {
+    const entry = perCourse.get(row._id.toString());
+    if (entry) entry.done += row.n;
+  }
+
+  let requiredItems = 0;
+  let completedItems = 0;
+  let completedCourses = 0;
+  for (const { required, done } of perCourse.values()) {
+    requiredItems += required;
+    completedItems += done;
+    // Same rule as `getCourseProgress`: an empty course is never "complete".
+    if (required > 0 && done === required) completedCourses += 1;
+  }
+
+  return { requiredItems, completedItems, completedCourses };
+};
+
+/**
+ * Every enrolled course with its progress, plus dashboard-level totals.
+ *
+ * The summary always covers the whole account. The course rows are paginated,
+ * so only a page's worth of per-course progress is computed in detail — a
+ * student with fifty courses costs the same as one with five.
+ */
 export const listMyCoursesProgress = async (
-  viewer: Viewer
-): Promise<{ courses: MyCourseProgress[]; summary: ProgressSummary }> => {
+  viewer: Viewer,
+  query: MyCoursesProgressQuery = { page: 1, limit: 20 }
+): Promise<{
+  courses: MyCourseProgress[];
+  summary: ProgressSummary;
+  pagination: PaginationMeta;
+}> => {
   const enrollments = await Enrollment.find({
     student: viewer.id,
     status: { $ne: EnrollmentStatus.CANCELLED },
-  }).populate({ path: "course", select: "title slug thumbnail" });
+  })
+    .sort({ enrolledAt: -1 })
+    .populate({ path: "course", select: "title slug thumbnail" });
 
+  /** Enrolments whose course still exists — a deleted course has nothing to show. */
+  const live = enrollments.filter((enrollment) => {
+    const raw = enrollment.course as unknown;
+    return (
+      raw !== null &&
+      typeof raw === "object" &&
+      "title" in (raw as Record<string, unknown>)
+    );
+  });
+
+  const allCourseIds = live.map(
+    (enrollment) => (enrollment.course as unknown as CourseDocument)._id
+  );
+
+  const [totals, bestPerQuiz] = await Promise.all([
+    summariseAllCourses(viewer.id, allCourseIds),
+    // Best attempt per quiz, so retries can only help a student's average.
+    QuizAttempt.aggregate<{ _id: Types.ObjectId; best: number }>([
+      { $match: { student: new Types.ObjectId(viewer.id) } },
+      { $group: { _id: "$quiz", best: { $max: "$percentage" } } },
+    ]),
+  ]);
+
+  const averageQuizScore =
+    bestPerQuiz.length > 0
+      ? Math.round(
+          bestPerQuiz.reduce((sum, row) => sum + row.best, 0) / bestPerQuiz.length
+        )
+      : null;
+
+  const pagination: PaginationMeta = {
+    page: query.page,
+    limit: query.limit,
+    total: live.length,
+    totalPages: Math.ceil(live.length / query.limit),
+  };
+
+  const page = live.slice((query.page - 1) * query.limit, query.page * query.limit);
+
+  // Detailed progress for the visible rows only. Sequential on purpose: the
+  // page size is bounded, and this keeps concurrent query count predictable.
   const courses: MyCourseProgress[] = [];
-  let requiredItems = 0;
-  let completedItems = 0;
-
-  for (const enrollment of enrollments) {
-    const rawCourse = enrollment.course as unknown;
-    if (
-      rawCourse === null ||
-      typeof rawCourse !== "object" ||
-      !("title" in (rawCourse as Record<string, unknown>))
-    ) {
-      continue;
-    }
-    const course = rawCourse as unknown as CourseDocument;
-
-    // Sequential on purpose: a student's course list is small, and this keeps
-    // the number of concurrent queries predictable.
+  for (const enrollment of page) {
+    const course = enrollment.course as unknown as CourseDocument;
     const progress = await getCourseProgress(course._id, viewer.id);
-    requiredItems += progress.totalRequiredItems;
-    completedItems += progress.completedRequiredItems;
-
     courses.push({
       course: {
         id: course._id.toString(),
@@ -351,28 +499,17 @@ export const listMyCoursesProgress = async (
     });
   }
 
-  // Best attempt per quiz, so retries can only help a student's average.
-  const bestPerQuiz = await QuizAttempt.aggregate<{ _id: Types.ObjectId; best: number }>([
-    { $match: { student: new Types.ObjectId(viewer.id) } },
-    { $group: { _id: "$quiz", best: { $max: "$percentage" } } },
-  ]);
-  const averageQuizScore =
-    bestPerQuiz.length > 0
-      ? Math.round(
-          bestPerQuiz.reduce((sum, row) => sum + row.best, 0) / bestPerQuiz.length
-        )
-      : null;
-
   return {
     courses,
     summary: {
-      activeCourses: courses.filter(
-        (entry) => entry.enrollmentStatus === EnrollmentStatus.ACTIVE
+      activeCourses: live.filter(
+        (enrollment) => enrollment.status === EnrollmentStatus.ACTIVE
       ).length,
-      completedCourses: courses.filter((entry) => entry.progress.isCompleted).length,
-      overallProgressPercentage: percentage(completedItems, requiredItems),
+      completedCourses: totals.completedCourses,
+      overallProgressPercentage: percentage(totals.completedItems, totals.requiredItems),
       averageQuizScore,
       quizzesAttempted: bestPerQuiz.length,
     },
+    pagination,
   };
 };

@@ -1,22 +1,9 @@
 import { Request, Response } from "express";
 import { Types } from "mongoose";
 import { checkAndCompleteCourse } from "../services/course-completion.service";
-import { Viewer } from "../services/courses.service";
 import * as progressService from "../services/progress.service";
-import { ApiError } from "../utils/ApiError";
-
-const requireViewer = (req: Request): Viewer => {
-  if (!req.user) {
-    throw ApiError.unauthorized();
-  }
-  return { id: req.user._id.toString(), role: req.user.role };
-};
-
-// Express 5 types route params as string | string[].
-const param = (req: Request, name: string): string => {
-  const value = req.params[name];
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-};
+import { param, requireViewer } from "../utils/requestContext";
+import { MyCoursesProgressQuery } from "../validators/progress.validators";
 
 /**
  * Records the lesson state, then lets the completion service decide whether the
@@ -91,6 +78,16 @@ export const getCourseProgress = async (req: Request, res: Response): Promise<vo
 };
 
 export const getMyCoursesProgress = async (req: Request, res: Response): Promise<void> => {
-  const data = await progressService.listMyCoursesProgress(requireViewer(req));
-  res.status(200).json({ success: true, message: "Progress retrieved", data });
+  const { courses, summary, pagination } = await progressService.listMyCoursesProgress(
+    requireViewer(req),
+    res.locals.query as MyCoursesProgressQuery
+  );
+  res.status(200).json({
+    success: true,
+    message: "Progress retrieved",
+    // `courses` and `summary` stay inside `data` so the existing shape holds;
+    // pagination sits alongside it like every other list endpoint.
+    data: { courses, summary },
+    pagination,
+  });
 };

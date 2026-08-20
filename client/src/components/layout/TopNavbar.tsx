@@ -1,22 +1,15 @@
 import {
-  Bell,
   Menu,
-  MessageSquare,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  Sun,
 } from "lucide-react";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-  type RefObject,
-} from "react";
+import { useState, type FormEvent, type RefObject } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { UserMenu } from "@/components/layout/UserMenu";
-import { cn } from "@/utils/cn";
+import { NotificationBell } from "@/components/layout/NotificationBell";
+import { useTheme } from "@/hooks/useTheme";
 
 interface TopNavbarProps {
   isCollapsed: boolean;
@@ -26,70 +19,11 @@ interface TopNavbarProps {
   mobileNavButtonRef: RefObject<HTMLButtonElement | null>;
 }
 
-/** Icon button that opens a small panel — notifications and messages. */
-const IconPanel = ({
-  label,
-  icon,
-  children,
-}: {
-  label: string;
-  icon: ReactNode;
-  children: ReactNode;
-}) => {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div ref={containerRef} className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label={label}
-        className={cn(
-          "flex size-10 items-center justify-center rounded-xl text-muted transition-colors duration-200",
-          "hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-          open && "bg-paper text-ink"
-        )}
-      >
-        {icon}
-      </button>
-      {open && (
-        <div
-          role="dialog"
-          aria-label={label}
-          className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-soft bg-surface p-4 shadow-lg"
-        >
-          <p className="text-sm font-semibold">{label}</p>
-          {children}
-        </div>
-      )}
-    </div>
-  );
-};
-
+/**
+ * The account menu is deliberately absent here: the sidebar footer carries it
+ * at every breakpoint — the rail above `lg`, the drawer footer below — so a
+ * second copy in the navbar was the same control twice on one screen.
+ */
 export const TopNavbar = ({
   isCollapsed,
   onToggleCollapse,
@@ -97,6 +31,7 @@ export const TopNavbar = ({
   mobileNavButtonRef,
 }: TopNavbarProps) => {
   const navigate = useNavigate();
+  const { resolved, toggle } = useTheme();
   const [query, setQuery] = useState("");
 
   const handleSearch = (event: FormEvent) => {
@@ -185,27 +120,24 @@ export const TopNavbar = ({
             <Search className="size-5" aria-hidden="true" />
           </Link>
 
-          <IconPanel label="Notifications" icon={<Bell className="size-5" aria-hidden="true" />}>
-            <p className="mt-1 text-sm text-muted">
-              You're all caught up. Course and enrollment alerts arrive with the
-              notifications phase.
-            </p>
-          </IconPanel>
+          <NotificationBell />
 
-          <IconPanel
-            label="Messages"
-            icon={<MessageSquare className="size-5" aria-hidden="true" />}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={
+              resolved === "dark" ? "Switch to light theme" : "Switch to dark theme"
+            }
+            title={resolved === "dark" ? "Light theme" : "Dark theme"}
+            className="flex size-10 items-center justify-center rounded-xl text-muted transition-colors duration-200 hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            <p className="mt-1 text-sm text-muted">
-              No messages yet. Direct messaging between students and instructors is
-              planned for a later phase.
-            </p>
-          </IconPanel>
+            {resolved === "dark" ? (
+              <Sun className="size-5" aria-hidden="true" />
+            ) : (
+              <Moon className="size-5" aria-hidden="true" />
+            )}
+          </button>
 
-          <div className="mx-1 hidden h-8 w-px bg-soft sm:block" aria-hidden="true" />
-
-          <UserMenu className="hidden sm:block sm:w-auto sm:min-w-[11rem]" />
-          <UserMenu compact className="sm:hidden" />
         </div>
       </div>
     </header>

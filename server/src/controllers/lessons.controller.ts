@@ -1,24 +1,6 @@
 import { Request, Response } from "express";
-import { Viewer } from "../services/courses.service";
 import * as lessonsService from "../services/lessons.service";
-import { ApiError } from "../utils/ApiError";
-
-const viewerOrNull = (req: Request): Viewer | null =>
-  req.user ? { id: req.user._id.toString(), role: req.user.role } : null;
-
-const requireViewer = (req: Request): Viewer => {
-  const viewer = viewerOrNull(req);
-  if (!viewer) {
-    throw ApiError.unauthorized();
-  }
-  return viewer;
-};
-
-// Express 5 types route params as string | string[].
-const param = (req: Request, name: string): string => {
-  const value = req.params[name];
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-};
+import { param, requireViewer, viewerOrNull } from "../utils/requestContext";
 
 export const listLessons = async (req: Request, res: Response): Promise<void> => {
   const lessons = await lessonsService.listLessons(
@@ -78,4 +60,20 @@ export const reorderLessons = async (req: Request, res: Response): Promise<void>
     requireViewer(req)
   );
   res.status(200).json({ success: true, message: "Lessons reordered", data: lessons });
+};
+
+export const bulkSetLessonStatus = async (req: Request, res: Response): Promise<void> => {
+  const { isPublished } = req.body as { isPublished: boolean };
+  const result = await lessonsService.bulkSetLessonStatus(
+    param(req, "moduleId"),
+    req.body,
+    requireViewer(req)
+  );
+  res.status(200).json({
+    success: true,
+    message: `${result.affected} lesson${result.affected === 1 ? "" : "s"} ${
+      isPublished ? "published" : "unpublished"
+    }`,
+    data: result,
+  });
 };

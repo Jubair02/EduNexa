@@ -35,3 +35,27 @@ export const allEnrollmentsQuerySchema = z.object({
 
 export type EnrollmentListQuery = z.infer<typeof myCoursesQuerySchema>;
 export type AllEnrollmentsQuery = z.infer<typeof allEnrollmentsQuerySchema>;
+
+/**
+ * The instructor's student roster. Paginated and searchable by name or email,
+ * filterable to one of the instructor's own courses.
+ */
+export const teachingStudentsQuerySchema = z.object({
+  page: z.coerce.number({ error: "page must be a number" }).int().min(1).default(1),
+  limit: z.coerce
+    .number({ error: "limit must be a number" })
+    .int()
+    .min(1)
+    .max(100)
+    .default(20),
+  search: z.string().trim().max(100).optional(),
+  course: z
+    .string()
+    .regex(OBJECT_ID_PATTERN, "course must be a valid course id")
+    .optional(),
+  status: statusSchema.optional(),
+  sortBy: z.enum(["name", "progress", "enrolledAt", "lastAccessedAt"]).default("name"),
+  sortOrder: z.enum(["asc", "desc"]).default("asc"),
+});
+
+export type TeachingStudentsQuery = z.infer<typeof teachingStudentsQuerySchema>;

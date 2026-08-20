@@ -2,6 +2,8 @@ import {
   Award,
   BookOpen,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Compass,
   PlayCircle,
   TrendingUp,
@@ -15,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { progressService } from "@/services/progress.service";
-import type { MyCourseProgress, ProgressSummary } from "@/types";
+import type { MyCourseProgress, Pagination, ProgressSummary } from "@/types";
 
 type LoadStatus = "loading" | "error" | "ready";
 
@@ -23,19 +25,22 @@ type LoadStatus = "loading" | "error" | "ready";
 export const StudentProgressPage = () => {
   const [courses, setCourses] = useState<MyCourseProgress[]>([]);
   const [summary, setSummary] = useState<ProgressSummary | null>(null);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [page, setPage] = useState(1);
   const [status, setStatus] = useState<LoadStatus>("loading");
 
   const load = useCallback(async () => {
     setStatus("loading");
     try {
-      const result = await progressService.myCourses();
+      const result = await progressService.myCourses({ page, limit: 10 });
       setCourses(result.courses);
       setSummary(result.summary);
+      setPagination(result.pagination);
       setStatus("ready");
     } catch {
       setStatus("error");
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     void load();
@@ -195,6 +200,35 @@ export const StudentProgressPage = () => {
                 </div>
               </div>
             ))}
+
+          {status === "ready" && pagination && pagination.totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-soft pt-4">
+              <p className="text-sm text-muted">
+                {pagination.total} course{pagination.total === 1 ? "" : "s"} — page{" "}
+                {pagination.page} of {pagination.totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pagination.page <= 1}
+                  onClick={() => setPage((current) => current - 1)}
+                >
+                  <ChevronLeft className="size-4" aria-hidden="true" />
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pagination.page >= pagination.totalPages}
+                  onClick={() => setPage((current) => current + 1)}
+                >
+                  Next
+                  <ChevronRight className="size-4" aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

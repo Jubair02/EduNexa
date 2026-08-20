@@ -1,7 +1,8 @@
-import { ArrowLeft, Pencil, Trash2, UserCheck, UserX } from "lucide-react";
+import { ArrowLeft, KeyRound, Pencil, Trash2, UserCheck, UserX } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ResetPasswordModal } from "@/components/ResetPasswordModal";
 import { RoleBadge, StatusBadge } from "@/components/UserBadges";
 import { UserFormModal } from "@/components/UserFormModal";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ export const UserDetailsPage = () => {
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [editOpen, setEditOpen] = useState(false);
   const [confirmType, setConfirmType] = useState<ConfirmType | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -162,6 +164,10 @@ export const UserDetailsPage = () => {
                 <Pencil className="size-4" aria-hidden="true" />
                 Edit
               </Button>
+              <Button variant="outline" onClick={() => setResetOpen(true)}>
+                <KeyRound className="size-4" aria-hidden="true" />
+                Reset password
+              </Button>
               {!isSelf && (
                 <>
                   <Button
@@ -202,6 +208,17 @@ export const UserDetailsPage = () => {
             setUser(updated);
             setEditOpen(false);
             showToast("User updated");
+          }}
+        />
+      )}
+
+      {resetOpen && user && (
+        <ResetPasswordModal
+          user={user}
+          onClose={() => setResetOpen(false)}
+          onReset={() => {
+            setResetOpen(false);
+            showToast("Password reset", "success");
           }}
         />
       )}

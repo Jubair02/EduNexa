@@ -12,6 +12,11 @@ import { Lesson } from "../models/lesson.model";
 import { Module } from "../models/module.model";
 import { User, UserRole } from "../models/user.model";
 import { ApiError } from "../utils/ApiError";
+import {
+  AuditAction,
+  AuditTargetType,
+} from "../models/audit-log.model";
+import { AuditActor, recordAudit } from "./audit.service";
 import { deleteStoredFile } from "../utils/fileStorage";
 import { slugify } from "../utils/slugify";
 import { PaginationMeta } from "./users.service";
@@ -20,6 +25,7 @@ import {
   ListCoursesQuery,
   UpdateCourseInput,
 } from "../validators/courses.validators";
+import { escapeRegex } from "../utils/escapeRegex";
 
 /** The authenticated caller, or null for anonymous/public requests. */
 export interface Viewer {
@@ -67,9 +73,6 @@ export interface CourseContentStats {
 }
 
 const INSTRUCTOR_FIELDS = "firstName lastName email";
-
-const escapeRegex = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const isStaff = (viewer: Viewer | null): viewer is Viewer =>
   viewer !== null && (viewer.role === UserRole.ADMIN || viewer.role === UserRole.INSTRUCTOR);
@@ -123,7 +126,7 @@ const toSafeCourse = (course: CourseDocument): SafeCourse => {
  * Generates a unique, URL-friendly slug from a title, suffixing -1, -2, …
  * for duplicates. Slugs are kept stable on edits so URLs never break.
  */
-export const generateUniqueSlug = async (title: string): Promise<string> => {
+const generateUniqueSlug = async (title: string): Promise<string> => {
   const base = slugify(title) || "course";
   const taken = new Set(
     (
@@ -349,11 +352,17 @@ export const updateCourse = async (
   return toSafeCourse(course);
 };
 
-export const deleteCourse = async (id: string, viewer: Viewer): Promise<void> => {
+/**
+ * Takes an `AuditActor` rather than a bare `Viewer`: instructors can delete
+ * their own courses, so the entry has to say which account did it and keep
+ * saying so after that account is gone. An actor is a viewer, so every
+ * authorization check below is unchanged.
+ */
+export const deleteCourse = async (id: string, actor: AuditActor): Promise<void> => {
   const course = await findCourseOrThrow(id);
-  assertCanManage(course, viewer);
+  assertCanManage(course, actor);
 
-  if (viewer.role === UserRole.INSTRUCTOR && course.status === CourseStatus.PUBLISHED) {
+  if (actor.role === UserRole.INSTRUCTOR && course.status === CourseStatus.PUBLISHED) {
     throw ApiError.forbidden(
       "Published courses must be archived before they can be deleted."
     );
@@ -369,6 +378,16 @@ export const deleteCourse = async (id: string, viewer: Viewer): Promise<void> =>
 
   await deleteStoredFile(course.thumbnail?.publicId);
   await course.deleteOne();
+
+  await recordAudit({
+    action: AuditAction.COURSE_DELETED,
+    actor,
+    targetType: AuditTargetType.COURSE,
+    targetId: course._id,
+    targetLabel: course.title,
+    summary: `Deleted course "${course.title}"`,
+    metadata: { slug: course.slug, status: course.status },
+  });
 };
 
 export const setCourseStatus = async (

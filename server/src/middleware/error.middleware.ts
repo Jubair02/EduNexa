@@ -1,12 +1,26 @@
 import { ErrorRequestHandler, Request, Response } from "express";
 import mongoose from "mongoose";
-import { isProduction, isTest } from "../config/env";
+import { isProduction } from "../config/env";
 import { ApiError } from "../utils/ApiError";
+import { describeError, logger } from "../utils/logger";
+
+// eslint-disable-next-line no-control-regex -- stripping control characters is the point
+const CONTROL_CHARS = new RegExp("[\u0000-\u001f\u007f]", "g");
+
+/**
+ * Reflects a request path back safely: no query string (it can carry tokens or
+ * search terms), length capped, and control characters removed so a hostile
+ * URL cannot smuggle escape sequences into a terminal reading the logs.
+ */
+const safePath = (req: Request): string => {
+  const path = req.path.replace(CONTROL_CHARS, "");
+  return path.length > 120 ? `${path.slice(0, 120)}…` : path;
+};
 
 export const notFoundHandler = (req: Request, res: Response): void => {
   res.status(404).json({
     success: false,
-    message: `Route ${req.method} ${req.originalUrl} not found`,
+    message: `Route ${req.method} ${safePath(req)} not found`,
   });
 };
 
@@ -22,12 +36,27 @@ const isDuplicateKeyError = (error: unknown): error is MongoDuplicateKeyError =>
 
 /**
  * Central error handler — every error in the app funnels here and is turned
- * into the consistent `{ success, message }` envelope. Stack traces are never
- * exposed in production responses.
+ * into the consistent `{ success, message }` envelope. Stack traces and driver
+ * internals are never exposed in production responses.
  */
-export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
+  const request = {
+    method: req.method,
+    path: safePath(req),
+    userId: req.user?._id.toString(),
+  };
+
   // Known, intentional errors
   if (err instanceof ApiError) {
+    // 401/403 are the interesting ones operationally: they are what a probe or
+    // a broken client looks like from the server side.
+    if (err.statusCode === 401 || err.statusCode === 403) {
+      logger.warn("request.denied", {
+        ...request,
+        status: err.statusCode,
+        reason: err.message,
+      });
+    }
     res.status(err.statusCode).json({ success: false, message: err.message });
     return;
   }
@@ -64,19 +93,40 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
-  // Multer upload errors (file too large, unexpected field, …)
-  if (err instanceof Error && err.name === "MulterError") {
-    const message =
-      (err as { code?: string }).code === "LIMIT_FILE_SIZE"
-        ? "The file is too large (maximum 20 MB)."
-        : "The file upload was rejected.";
-    res.status(400).json({ success: false, message });
+  // Body larger than the configured JSON limit
+  if (
+    err instanceof Error &&
+    (err as { type?: string }).type === "entity.too.large"
+  ) {
+    res.status(413).json({
+      success: false,
+      message: "That request is too large. Please shorten the content and try again.",
+    });
     return;
   }
 
-  if (!isTest) {
-    console.error("[error] Unhandled error:", err);
+  // Multer upload errors (file too large, unexpected field, …)
+  if (err instanceof Error && err.name === "MulterError") {
+    const code = (err as { code?: string }).code;
+    logger.warn("upload.multer_error", { ...request, code });
+    res.status(400).json({
+      success: false,
+      message:
+        code === "LIMIT_FILE_SIZE"
+          ? "The file is too large (maximum 20 MB)."
+          : "The file upload was rejected.",
+    });
+    return;
   }
+
+  // Anything reaching here is a bug or an infrastructure failure. It is logged
+  // in full server-side; the client is told nothing about the internals.
+  const isDatabaseError =
+    err instanceof mongoose.Error || (err as { name?: string })?.name === "MongoServerError";
+  logger.error(isDatabaseError ? "database.error" : "unhandled.error", {
+    ...request,
+    ...describeError(err),
+  });
 
   res.status(500).json({
     success: false,

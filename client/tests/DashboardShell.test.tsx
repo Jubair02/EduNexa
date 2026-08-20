@@ -87,21 +87,32 @@ describe("Sidebar navigation", () => {
       ["My Progress", "/student/progress"],
       ["Quizzes", "/student/quizzes"],
       ["Certificates", "/student/certificates"],
+      ["Settings", "/settings"],
+      ["Help & Support", "/help"],
     ]) {
       expect(within(nav).getByRole("link", { name: label })).toHaveAttribute("href", href);
     }
   });
 
-  it("renders unbuilt entries as disabled rather than dead links", () => {
-    renderShell(student);
-    const nav = screen.getByRole("navigation", { name: "Main" });
+  it("has no dead or disabled rows left in any role's navigation", () => {
+    for (const actor of [student, makeAdmin(), makeUser({ role: "instructor" })]) {
+      const view = renderShell(actor, {
+        entry: actor.role === "admin" ? "/admin/dashboard" : "/student/dashboard",
+      });
+      const nav = screen.getByRole("navigation", { name: "Main" });
 
-    expect(within(nav).queryByRole("link", { name: /Settings/ })).not.toBeInTheDocument();
-    expect(within(nav).getByText("Settings").closest("[aria-disabled]")).toHaveAttribute(
-      "aria-disabled",
-      "true"
-    );
-    expect(within(nav).getAllByText("Soon").length).toBeGreaterThan(0);
+      // Every row is a link with a real href — nothing disabled, nothing
+      // labelled "Soon". `NavItem.to` is required, so this is type-enforced too.
+      const links = within(nav).getAllByRole("link");
+      expect(links.length).toBeGreaterThan(0);
+      for (const link of links) {
+        expect(link.getAttribute("href")).toMatch(/^\//);
+      }
+      expect(within(nav).queryByText("Soon")).not.toBeInTheDocument();
+      expect(nav.querySelector("[aria-disabled]")).toBeNull();
+
+      view.unmount();
+    }
   });
 
   it("collapses to icons only and remembers the choice", async () => {
@@ -172,26 +183,39 @@ describe("Top navbar", () => {
     expect(screen.getByText("catalog page")).toBeInTheDocument();
   });
 
-  it("offers notifications and messages with honest empty states", async () => {
+  it("switches the theme and remembers the choice", async () => {
     renderShell(student);
 
-    await userEvent.click(screen.getByRole("button", { name: "Notifications" }));
-    expect(
-      await screen.findByRole("dialog", { name: "Notifications" })
-    ).toBeInTheDocument();
-    expect(screen.getByText(/You're all caught up/)).toBeInTheDocument();
+    // Nothing is stamped on <html> until a choice is made — the operating
+    // system decides by default.
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
 
-    await userEvent.click(screen.getByRole("button", { name: "Messages" }));
-    expect(screen.getByText(/No messages yet/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Switch to dark theme" }));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    expect(localStorage.getItem("lms_theme")).toBe("dark");
+
+    await userEvent.click(screen.getByRole("button", { name: "Switch to light theme" }));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    expect(localStorage.getItem("lms_theme")).toBe("light");
+  });
+
+  it("advertises no feature that does not exist", () => {
+    renderShell(student);
+
+    // Direct messaging was never built; a panel promising it is worse than
+    // nothing. Notifications are a real feature and live in their own bell.
+    expect(screen.queryByRole("button", { name: "Messages" })).not.toBeInTheDocument();
   });
 
   it("signs out from the profile menu", async () => {
     const authValue = makeAuthValue(student);
     renderShell(student, { authValue });
 
-    // The navbar and the sidebar footer both expose the account menu in jsdom.
+    // The sidebar footer is the only place the account menu lives; in jsdom the
+    // desktop rail and the (closed) drawer are not both mounted, so this is one
+    // element rather than a list.
     await userEvent.click(
-      screen.getAllByRole("button", { name: /Account menu for Sam Student/ })[0]
+      screen.getByRole("button", { name: /Account menu for Sam Student/ })
     );
 
     const menu = await screen.findByRole("menu", { name: "Account" });
@@ -199,6 +223,24 @@ describe("Top navbar", () => {
 
     await userEvent.click(within(menu).getByRole("menuitem", { name: /Sign out/ }));
     expect(authValue.logout).toHaveBeenCalled();
+  });
+
+  it("offers the account menu once, from the sidebar rather than the navbar", () => {
+    renderShell(student);
+
+    // Two copies of the same control on one screen is the thing being
+    // prevented: the navbar used to carry its own alongside the sidebar's.
+    const menus = screen.getAllByRole("button", {
+      name: /Account menu for Sam Student/,
+    });
+    expect(menus).toHaveLength(1);
+
+    // And it is the sidebar's — the navbar header must not contain it.
+    expect(
+      within(screen.getByRole("banner")).queryByRole("button", {
+        name: /Account menu for Sam Student/,
+      })
+    ).not.toBeInTheDocument();
   });
 
   it("provides a skip link to the main content", () => {

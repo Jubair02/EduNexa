@@ -1,23 +1,9 @@
 import { Request, Response } from "express";
 import { checkAndCompleteCourse } from "../services/course-completion.service";
-import { Viewer } from "../services/courses.service";
 import * as attemptsService from "../services/quiz-attempts.service";
 import * as quizzesService from "../services/quizzes.service";
-import { ApiError } from "../utils/ApiError";
-import { AttemptsQuery } from "../validators/quizzes.validators";
-
-const requireViewer = (req: Request): Viewer => {
-  if (!req.user) {
-    throw ApiError.unauthorized();
-  }
-  return { id: req.user._id.toString(), role: req.user.role };
-};
-
-// Express 5 types route params as string | string[].
-const param = (req: Request, name: string): string => {
-  const value = req.params[name];
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-};
+import { AttemptsQuery, MyQuizzesQuery } from "../validators/quizzes.validators";
+import { param, requireViewer } from "../utils/requestContext";
 
 export const listCourseQuizzes = async (req: Request, res: Response): Promise<void> => {
   const quizzes = await quizzesService.listCourseQuizzes(
@@ -28,8 +14,16 @@ export const listCourseQuizzes = async (req: Request, res: Response): Promise<vo
 };
 
 export const listMyQuizzes = async (req: Request, res: Response): Promise<void> => {
-  const quizzes = await quizzesService.listMyQuizzes(requireViewer(req));
-  res.status(200).json({ success: true, message: "Quizzes retrieved", data: quizzes });
+  const { quizzes, pagination } = await quizzesService.listMyQuizzes(
+    requireViewer(req),
+    res.locals.query as MyQuizzesQuery
+  );
+  res.status(200).json({
+    success: true,
+    message: "Quizzes retrieved",
+    data: quizzes,
+    pagination,
+  });
 };
 
 export const getQuiz = async (req: Request, res: Response): Promise<void> => {

@@ -1,26 +1,8 @@
 import { Request, Response } from "express";
 import { CourseStatus } from "../models/course.model";
 import * as coursesService from "../services/courses.service";
-import { Viewer } from "../services/courses.service";
-import { ApiError } from "../utils/ApiError";
 import { ListCoursesQuery } from "../validators/courses.validators";
-
-const viewerOrNull = (req: Request): Viewer | null =>
-  req.user ? { id: req.user._id.toString(), role: req.user.role } : null;
-
-const requireViewer = (req: Request): Viewer => {
-  const viewer = viewerOrNull(req);
-  if (!viewer) {
-    throw ApiError.unauthorized();
-  }
-  return viewer;
-};
-
-// Express 5 types route params as string | string[].
-const param = (req: Request, name: string): string => {
-  const value = req.params[name];
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-};
+import { param, requireActor, requireViewer, viewerOrNull } from "../utils/requestContext";
 
 export const listCourses = async (req: Request, res: Response): Promise<void> => {
   const query = res.locals.query as ListCoursesQuery;
@@ -68,7 +50,7 @@ export const setCourseStatus = async (req: Request, res: Response): Promise<void
 };
 
 export const deleteCourse = async (req: Request, res: Response): Promise<void> => {
-  await coursesService.deleteCourse(param(req, "id"), requireViewer(req));
+  await coursesService.deleteCourse(param(req, "id"), requireActor(req));
   res.status(200).json({ success: true, message: "Course deleted" });
 };
 

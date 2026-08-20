@@ -59,19 +59,25 @@ export const makeAuthValue = (user: User | null): AuthContextValue => ({
   login: vi.fn(),
   register: vi.fn(),
   logout: vi.fn(),
+  updateProfile: vi.fn(),
 });
 
 interface RenderOptions {
   authUser?: User | null;
   initialEntries?: string[];
+  /**
+   * A ready-made context value, for tests that need to assert on one of its
+   * functions (e.g. updateProfile). Takes precedence over `authUser`.
+   */
+  authValue?: AuthContextValue;
 }
 
 export const renderWithProviders = (
   ui: ReactElement,
-  { authUser = makeAdmin(), initialEntries = ["/"] }: RenderOptions = {}
+  { authUser = makeAdmin(), initialEntries = ["/"], authValue }: RenderOptions = {}
 ) => {
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <AuthContext.Provider value={makeAuthValue(authUser)}>
+    <AuthContext.Provider value={authValue ?? makeAuthValue(authUser)}>
       <ToastProvider>
         <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
       </ToastProvider>

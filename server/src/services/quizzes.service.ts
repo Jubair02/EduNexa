@@ -8,7 +8,12 @@ import { UserRole } from "../models/user.model";
 import { ApiError } from "../utils/ApiError";
 import { findAccessibleEnrollment } from "./course-access.service";
 import { Viewer, canManageCourse } from "./courses.service";
-import { CreateQuizInput, UpdateQuizInput } from "../validators/quizzes.validators";
+import { PaginationMeta } from "./users.service";
+import {
+  CreateQuizInput,
+  MyQuizzesQuery,
+  UpdateQuizInput,
+} from "../validators/quizzes.validators";
 
 const TRUE_FALSE_OPTIONS = ["true", "false"];
 
@@ -64,7 +69,7 @@ const baseFields = (quiz: QuizDocument): BaseQuiz => ({
   updatedAt: quiz.updatedAt,
 });
 
-export const toManageQuiz = (quiz: QuizDocument): ManageQuiz => ({
+const toManageQuiz = (quiz: QuizDocument): ManageQuiz => ({
   ...baseFields(quiz),
   questions: quiz.questions
     .slice()
@@ -81,7 +86,7 @@ export const toManageQuiz = (quiz: QuizDocument): ManageQuiz => ({
 });
 
 /** Serialization for students — `correctAnswer` is never included. */
-export const toStudentQuiz = (quiz: QuizDocument): StudentQuiz => ({
+const toStudentQuiz = (quiz: QuizDocument): StudentQuiz => ({
   ...baseFields(quiz),
   questions: quiz.questions
     .slice()
@@ -245,8 +250,9 @@ export interface StudentQuizOverview extends StudentQuiz {
  * "Quizzes" screen without an N+1 walk from the client.
  */
 export const listMyQuizzes = async (
-  viewer: Viewer
-): Promise<StudentQuizOverview[]> => {
+  viewer: Viewer,
+  query: MyQuizzesQuery = { page: 1, limit: 20 }
+): Promise<{ quizzes: StudentQuizOverview[]; pagination: PaginationMeta }> => {
   if (viewer.role !== UserRole.STUDENT) {
     throw ApiError.forbidden("Only students have a personal quiz list.");
   }
@@ -255,13 +261,17 @@ export const listMyQuizzes = async (
     student: viewer.id,
     status: { $in: [EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED] },
   }).select("course");
-  if (enrollments.length === 0) return [];
+  const emptyPage = {
+    quizzes: [],
+    pagination: { page: query.page, limit: query.limit, total: 0, totalPages: 0 },
+  };
+  if (enrollments.length === 0) return emptyPage;
 
   const courses = await Course.find({
     _id: { $in: enrollments.map((enrollment) => enrollment.course) },
     status: CourseStatus.PUBLISHED,
   }).select("title");
-  if (courses.length === 0) return [];
+  if (courses.length === 0) return emptyPage;
 
   const courseIds = courses.map((course) => course._id);
   const titleByCourse = new Map(
@@ -282,7 +292,20 @@ export const listMyQuizzes = async (
       { module: null },
     ],
   }).sort({ createdAt: 1 });
-  if (quizzes.length === 0) return [];
+  if (quizzes.length === 0) return emptyPage;
+
+  // Paged after the visibility rules, so page 1 is the first quizzes a student
+  // can actually take rather than the first rows in the collection.
+  const pagination: PaginationMeta = {
+    page: query.page,
+    limit: query.limit,
+    total: quizzes.length,
+    totalPages: Math.ceil(quizzes.length / query.limit),
+  };
+  const page = quizzes.slice(
+    (query.page - 1) * query.limit,
+    query.page * query.limit
+  );
 
   // One aggregate for every attempt, rather than a query per quiz.
   const stats = await QuizAttempt.aggregate<{
@@ -294,7 +317,7 @@ export const listMyQuizzes = async (
     {
       $match: {
         student: new Types.ObjectId(viewer.id),
-        quiz: { $in: quizzes.map((quiz) => quiz._id) },
+        quiz: { $in: page.map((quiz) => quiz._id) },
       },
     },
     {
@@ -308,17 +331,20 @@ export const listMyQuizzes = async (
   ]);
   const statsByQuiz = new Map(stats.map((row) => [row._id.toString(), row]));
 
-  return quizzes.map((quiz) => {
-    const stat = statsByQuiz.get(quiz._id.toString());
-    return {
-      ...toStudentQuiz(quiz),
-      courseId: quiz.course.toString(),
-      courseTitle: titleByCourse.get(quiz.course.toString()) ?? "",
-      attemptCount: stat?.attemptCount ?? 0,
-      bestPercentage: stat ? stat.best : null,
-      passed: (stat?.passed ?? 0) === 1,
-    };
-  });
+  return {
+    quizzes: page.map((quiz) => {
+      const stat = statsByQuiz.get(quiz._id.toString());
+      return {
+        ...toStudentQuiz(quiz),
+        courseId: quiz.course.toString(),
+        courseTitle: titleByCourse.get(quiz.course.toString()) ?? "",
+        attemptCount: stat?.attemptCount ?? 0,
+        bestPercentage: stat ? stat.best : null,
+        passed: (stat?.passed ?? 0) === 1,
+      };
+    }),
+    pagination,
+  };
 };
 
 export const getQuiz = async (

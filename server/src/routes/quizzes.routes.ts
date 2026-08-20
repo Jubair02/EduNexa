@@ -1,12 +1,14 @@
 import { Router } from "express";
 import * as quizzesController from "../controllers/quizzes.controller";
 import { authenticate, authorize } from "../middleware/auth.middleware";
+import { writeLimiter } from "../middleware/rate-limit.middleware";
 import { validate, validateQuery } from "../middleware/validate.middleware";
 import { UserRole } from "../models/user.model";
 import { publishStatusSchema } from "../validators/modules.validators";
 import {
   attemptsQuerySchema,
   createQuizSchema,
+  myQuizzesQuerySchema,
   submitQuizSchema,
   updateQuizSchema,
 } from "../validators/quizzes.validators";
@@ -31,7 +33,12 @@ courseQuizzesRouter.post(
 export const quizzesRouter = Router();
 
 // Static path before "/:id" so it isn't swallowed by the id route.
-quizzesRouter.get("/my-quizzes", ...studentOnly, quizzesController.listMyQuizzes);
+quizzesRouter.get(
+  "/my-quizzes",
+  ...studentOnly,
+  validateQuery(myQuizzesQuerySchema),
+  quizzesController.listMyQuizzes
+);
 
 quizzesRouter.get("/:id", authenticate, quizzesController.getQuiz);
 quizzesRouter.put(
@@ -48,9 +55,12 @@ quizzesRouter.patch(
   quizzesController.setQuizStatus
 );
 
+// Submission is scored and stored on every call, and unlimited attempts are
+// allowed by design — so it gets the per-account write limit.
 quizzesRouter.post(
   "/:id/submit",
   ...studentOnly,
+  writeLimiter,
   validate(submitQuizSchema),
   quizzesController.submitQuiz
 );

@@ -1,8 +1,19 @@
 import app from "./app";
 import { connectDatabase, disconnectDatabase } from "./config/db";
-import { env } from "./config/env";
+import { assertProductionSecrets, env } from "./config/env";
 
 const start = async (): Promise<void> => {
+  // Fail loudly at boot rather than silently issuing forgeable tokens.
+  try {
+    assertProductionSecrets();
+  } catch (error) {
+    console.error(
+      "[server]",
+      error instanceof Error ? error.message : "Invalid configuration"
+    );
+    process.exit(1);
+  }
+
   try {
     await connectDatabase(env.MONGODB_URI);
   } catch (error) {

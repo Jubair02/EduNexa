@@ -16,6 +16,12 @@ export interface IUser {
   password: string;
   role: UserRole;
   isActive: boolean;
+  /**
+   * When this person last opened their notifications. Notifications are derived
+   * from existing records rather than stored, so this single timestamp is all
+   * the read state there is.
+   */
+  notificationsSeenAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +69,9 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    notificationsSeenAt: {
+      type: Date,
     },
   },
   {

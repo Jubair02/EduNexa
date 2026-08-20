@@ -11,7 +11,6 @@ import { makeAdmin, makeUser, renderWithProviders } from "./helpers";
 
 vi.mock("@/services/progress.service", () => ({
   progressService: {
-    completeLesson: vi.fn(),
     setLessonProgress: vi.fn(),
     getLessonProgress: vi.fn(),
     getCourseProgress: vi.fn(),
@@ -38,6 +37,13 @@ const mockedProgress = vi.mocked(progressService);
 const mockedQuizzes = vi.mocked(quizzesService);
 
 const student = makeUser({ role: "student", firstName: "Lea", id: "student-1" });
+
+/** These two lists are paginated; the fixtures only ever need one page. */
+const coursePage = { page: 1, limit: 10, total: 2, totalPages: 1 };
+const quizPage = (quizzes: StudentQuizOverview[]) => ({
+  quizzes,
+  pagination: { page: 1, limit: 20, total: quizzes.length, totalPages: 1 },
+});
 
 const makeProgress = (overrides: Partial<CourseProgress> = {}): CourseProgress => ({
   courseId: "c-1",
@@ -112,6 +118,7 @@ describe("StudentProgressPage", () => {
         averageQuizScore: 85,
         quizzesAttempted: 2,
       },
+      pagination: coursePage,
     });
 
     renderWithProviders(<StudentProgressPage />, { authUser: student });
@@ -153,6 +160,7 @@ describe("StudentProgressPage", () => {
         averageQuizScore: null,
         quizzesAttempted: 0,
       },
+      pagination: coursePage,
     });
 
     renderWithProviders(<StudentProgressPage />, { authUser: student });
@@ -166,6 +174,62 @@ describe("StudentProgressPage", () => {
     );
   });
 
+  it("pages the course list without changing the summary", async () => {
+    mockedProgress.myCourses.mockResolvedValue({
+      courses: [
+        {
+          course: { id: "c-1", title: "Tracked Course", slug: "tracked-course" },
+          enrollmentStatus: "active",
+          progress: makeProgress(),
+        },
+      ],
+      summary: {
+        activeCourses: 12,
+        completedCourses: 4,
+        overallProgressPercentage: 55,
+        averageQuizScore: 80,
+        quizzesAttempted: 9,
+      },
+      pagination: { page: 1, limit: 10, total: 25, totalPages: 3 },
+    });
+
+    renderWithProviders(<StudentProgressPage />, { authUser: student });
+
+    expect(await screen.findByText("25 courses — page 1 of 3")).toBeInTheDocument();
+    // The tiles describe the whole account, not the page.
+    expect(screen.getByText("55%")).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /Next/ }));
+
+    await waitFor(() => {
+      expect(mockedProgress.myCourses).toHaveBeenLastCalledWith({ page: 2, limit: 10 });
+    });
+  });
+
+  it("hides the pager when everything fits on one page", async () => {
+    // Set explicitly: clearAllMocks resets calls but not implementations, so a
+    // multi-page mock from an earlier test would otherwise leak in here.
+    mockedProgress.myCourses.mockResolvedValue({
+      courses: [],
+      summary: {
+        activeCourses: 1,
+        completedCourses: 0,
+        overallProgressPercentage: 0,
+        averageQuizScore: null,
+        quizzesAttempted: 0,
+      },
+      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+    });
+
+    renderWithProviders(<StudentProgressPage />, { authUser: student });
+
+    await screen.findByText("Completed Courses");
+    expect(screen.queryByRole("button", { name: /Next/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/page 1 of/)).not.toBeInTheDocument();
+  });
+
   it("offers a retry when the request fails", async () => {
     mockedProgress.myCourses.mockRejectedValueOnce(new Error("network"));
     mockedProgress.myCourses.mockResolvedValueOnce({
@@ -177,6 +241,7 @@ describe("StudentProgressPage", () => {
         averageQuizScore: null,
         quizzesAttempted: 0,
       },
+      pagination: coursePage,
     });
 
     renderWithProviders(<StudentProgressPage />, { authUser: student });
@@ -198,7 +263,7 @@ describe("StudentQuizzesPage", () => {
   });
 
   it("groups quizzes by course and summarises the student's own attempts", async () => {
-    mockedQuizzes.myQuizzes.mockResolvedValue([
+    mockedQuizzes.myQuizzes.mockResolvedValue(quizPage([
       makeQuizOverview({ attemptCount: 2, bestPercentage: 100, passed: true }),
       makeQuizOverview({
         id: "q-2",
@@ -214,7 +279,7 @@ describe("StudentQuizzesPage", () => {
         title: "Warm Up",
         isRequired: false,
       }),
-    ]);
+    ]));
 
     renderWithProviders(<StudentQuizzesPage />, { authUser: student });
 
@@ -245,10 +310,10 @@ describe("StudentQuizzesPage", () => {
   });
 
   it("filters to outstanding quizzes and searches by title", async () => {
-    mockedQuizzes.myQuizzes.mockResolvedValue([
+    mockedQuizzes.myQuizzes.mockResolvedValue(quizPage([
       makeQuizOverview({ attemptCount: 1, bestPercentage: 90, passed: true }),
       makeQuizOverview({ id: "q-2", title: "Final Exam" }),
-    ]);
+    ]));
 
     renderWithProviders(<StudentQuizzesPage />, { authUser: student });
     await screen.findByText("Fundamentals Check");
@@ -275,8 +340,26 @@ describe("StudentQuizzesPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("pages the quiz list and says the count is page-scoped", async () => {
+    mockedQuizzes.myQuizzes.mockResolvedValue({
+      quizzes: [makeQuizOverview({ passed: true })],
+      pagination: { page: 1, limit: 20, total: 30, totalPages: 2 },
+    });
+
+    renderWithProviders(<StudentQuizzesPage />, { authUser: student });
+
+    expect(await screen.findByText("30 quizzes — page 1 of 2")).toBeInTheDocument();
+    // With more than one page, the header is explicit that the tally is partial.
+    expect(screen.getByText("1 of 1 passed on this page.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Next/ }));
+    await waitFor(() => {
+      expect(mockedQuizzes.myQuizzes).toHaveBeenLastCalledWith({ page: 2, limit: 20 });
+    });
+  });
+
   it("explains the empty state when no course has published a quiz", async () => {
-    mockedQuizzes.myQuizzes.mockResolvedValue([]);
+    mockedQuizzes.myQuizzes.mockResolvedValue(quizPage([]));
 
     renderWithProviders(<StudentQuizzesPage />, { authUser: student });
 
@@ -289,7 +372,7 @@ describe("StudentQuizzesPage", () => {
 
   it("offers a retry when the request fails", async () => {
     mockedQuizzes.myQuizzes.mockRejectedValueOnce(new Error("network"));
-    mockedQuizzes.myQuizzes.mockResolvedValueOnce([]);
+    mockedQuizzes.myQuizzes.mockResolvedValueOnce(quizPage([]));
 
     renderWithProviders(<StudentQuizzesPage />, { authUser: student });
 
@@ -358,6 +441,22 @@ describe("AdminQuizAttemptsPage", () => {
     expect(within(table).getByText("Failed")).toBeInTheDocument();
   });
 
+  it("repeats each attempt as a card for phones", async () => {
+    mockedQuizzes.allAttempts.mockResolvedValue({
+      attempts: [attempt()],
+      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+    });
+
+    renderWithProviders(<AdminQuizAttemptsPage />, { authUser: makeAdmin() });
+
+    const cards = await screen.findByRole("list", { name: "Quiz attempts" });
+    const row = within(cards).getAllByRole("listitem")[0];
+    expect(row).toHaveTextContent("Lea Learner");
+    expect(row).toHaveTextContent("Fundamentals Check");
+    expect(row).toHaveTextContent("18/20");
+    expect(row).toHaveTextContent("Passed");
+  });
+
   it("passes the result filter to the API and resets to page one", async () => {
     mockedQuizzes.allAttempts.mockResolvedValue({
       attempts: [attempt()],
@@ -387,7 +486,8 @@ describe("AdminQuizAttemptsPage", () => {
 
     renderWithProviders(<AdminQuizAttemptsPage />, { authUser: makeAdmin() });
 
-    expect(await screen.findByText("Deleted user")).toBeInTheDocument();
+    const table = await screen.findByRole("table");
+    expect(within(table).getByText("Deleted user")).toBeInTheDocument();
   });
 
   it("shows an empty state when nothing has been attempted", async () => {

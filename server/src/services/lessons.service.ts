@@ -10,7 +10,11 @@ import {
   touchLastAccessed,
 } from "./course-access.service";
 import { Viewer, canManageCourse } from "./courses.service";
-import { CreateLessonInput, UpdateLessonInput } from "../validators/lessons.validators";
+import {
+  BulkLessonStatusInput,
+  CreateLessonInput,
+  UpdateLessonInput,
+} from "../validators/lessons.validators";
 
 /** Lesson metadata without body content — used in listings. */
 export interface SafeLessonSummary {
@@ -420,4 +424,39 @@ export const reorderLessons = async (
   );
 
   return listLessons(moduleId, viewer);
+};
+
+/**
+ * Publishes or unpublishes several lessons in one module at once.
+ *
+ * Publishing is a three-level chain, so an instructor bringing a module live
+ * would otherwise click through every lesson individually. Ownership is checked
+ * once, and every id must belong to the named module — a foreign id is refused
+ * rather than silently skipped, so the reported count is always the truth.
+ */
+export const bulkSetLessonStatus = async (
+  moduleId: string,
+  input: BulkLessonStatusInput,
+  viewer: Viewer
+): Promise<{ requested: number; affected: number }> => {
+  const module = await findModuleOrThrow(moduleId);
+  await getManagedCourse(module.course, viewer);
+
+  const owned = await Lesson.find({
+    _id: { $in: input.lessonIds },
+    module: module._id,
+  }).select("_id");
+
+  if (owned.length !== input.lessonIds.length) {
+    throw ApiError.badRequest("One or more lessons do not belong to this module");
+  }
+
+  const result = await Lesson.updateMany(
+    { _id: { $in: input.lessonIds } },
+    { isPublished: input.isPublished }
+  );
+
+  // Matched, not modified: every id here is known to exist and belong to the
+  // module, and all of them are now in the requested state.
+  return { requested: input.lessonIds.length, affected: result.matchedCount };
 };

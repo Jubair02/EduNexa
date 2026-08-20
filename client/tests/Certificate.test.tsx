@@ -247,13 +247,36 @@ describe("AdminCertificatesPage", () => {
 
     renderAdmin();
 
-    expect(await screen.findByText("LMS-2026-000001")).toBeInTheDocument();
-    const table = screen.getByRole("table");
+    // Table and card list both render in jsdom, so scope to the table.
+    const table = await screen.findByRole("table");
+    expect(within(table).getByText("LMS-2026-000001")).toBeInTheDocument();
     expect(within(table).getByText("Jubair Hossain")).toBeInTheDocument();
     expect(within(table).getByText("jubair@example.com")).toBeInTheDocument();
     expect(within(table).getByText("React Fundamentals")).toBeInTheDocument();
     // Scoped to the table: "Active" is also a status filter option.
     expect(within(table).getByText("Active")).toBeInTheDocument();
+  });
+
+  it("repeats each certificate as a card for phones", async () => {
+    mocked.list.mockResolvedValue(listResult([makeCertificate()], 10));
+
+    renderAdmin();
+
+    const cards = await screen.findByRole("list", { name: "Certificates" });
+    const row = within(cards).getAllByRole("listitem")[0];
+    expect(row).toHaveTextContent("Jubair Hossain");
+    expect(row).toHaveTextContent("React Fundamentals");
+    expect(row).toHaveTextContent("LMS-2026-000001");
+    // The same three actions are reachable without the table.
+    expect(
+      within(row).getByRole("button", { name: /Revoke LMS-2026-000001/ })
+    ).toBeInTheDocument();
+    expect(
+      within(row).getByRole("button", { name: /Download LMS-2026-000001/ })
+    ).toBeInTheDocument();
+    expect(
+      within(row).getByRole("link", { name: /View LMS-2026-000001/ })
+    ).toBeInTheDocument();
   });
 
   it("revokes a certificate after confirmation", async () => {
@@ -262,8 +285,9 @@ describe("AdminCertificatesPage", () => {
 
     renderAdmin();
 
+    const table = await screen.findByRole("table");
     await userEvent.click(
-      await screen.findByRole("button", { name: /Revoke LMS-2026-000001/ })
+      within(table).getByRole("button", { name: /Revoke LMS-2026-000001/ })
     );
     const dialog = await screen.findByRole("dialog");
     expect(
@@ -285,8 +309,9 @@ describe("AdminCertificatesPage", () => {
 
     renderAdmin();
 
+    const table = await screen.findByRole("table");
     await userEvent.click(
-      await screen.findByRole("button", { name: /Restore LMS-2026-000001/ })
+      within(table).getByRole("button", { name: /Restore LMS-2026-000001/ })
     );
     const dialog = await screen.findByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: "Restore" }));

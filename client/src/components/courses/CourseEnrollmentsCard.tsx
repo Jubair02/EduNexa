@@ -33,6 +33,9 @@ export const CourseEnrollmentsCard = ({ courseId }: { courseId: string }) => {
     limit: 10,
     search: "",
     status: "",
+    // Newest enrolment first — the server's existing default, now explicit.
+    sortBy: "enrolledAt",
+    sortOrder: "desc",
   });
   const [searchInput, setSearchInput] = useState("");
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -134,44 +137,75 @@ export const CourseEnrollmentsCard = ({ courseId }: { courseId: string }) => {
         )}
 
         {status === "ready" && enrollments.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-soft text-xs text-muted uppercase">
-                  <th className="py-2 pr-4 font-medium">Student</th>
-                  <th className="py-2 pr-4 font-medium">Email</th>
-                  <th className="py-2 pr-4 font-medium">Enrolled</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
-                  <th className="py-2 font-medium">Last accessed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {enrollments.map((enrollment) => (
-                  <tr key={enrollment.id} className="border-b border-soft last:border-0">
-                    <td className="py-3 pr-4 font-medium">
-                      {enrollment.student
-                        ? `${enrollment.student.firstName} ${enrollment.student.lastName}`
-                        : "Deleted user"}
-                    </td>
-                    <td className="py-3 pr-4 text-muted">
-                      {enrollment.student?.email ?? "—"}
-                    </td>
-                    <td className="py-3 pr-4 text-muted">
-                      {new Date(enrollment.enrolledAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <EnrollmentStatusBadge status={enrollment.status} />
-                    </td>
-                    <td className="py-3 text-muted">
-                      {enrollment.lastAccessedAt
-                        ? new Date(enrollment.lastAccessedAt).toLocaleString()
-                        : "Never"}
-                    </td>
+          <>
+            {/* Desktop table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-soft text-xs text-muted uppercase">
+                    <th className="py-2 pr-4 font-medium">Student</th>
+                    <th className="py-2 pr-4 font-medium">Email</th>
+                    <th className="py-2 pr-4 font-medium">Enrolled</th>
+                    <th className="py-2 pr-4 font-medium">Status</th>
+                    <th className="py-2 font-medium">Last accessed</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {enrollments.map((enrollment) => (
+                    <tr key={enrollment.id} className="border-b border-soft last:border-0">
+                      <td className="py-3 pr-4 font-medium">
+                        {enrollment.student
+                          ? `${enrollment.student.firstName} ${enrollment.student.lastName}`
+                          : "Deleted user"}
+                      </td>
+                      <td className="py-3 pr-4 text-muted">
+                        {enrollment.student?.email ?? "—"}
+                      </td>
+                      <td className="py-3 pr-4 text-muted">
+                        {new Date(enrollment.enrolledAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <EnrollmentStatusBadge status={enrollment.status} />
+                      </td>
+                      <td className="py-3 text-muted">
+                        {enrollment.lastAccessedAt
+                          ? new Date(enrollment.lastAccessedAt).toLocaleString()
+                          : "Never"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <ul className="space-y-3 md:hidden" aria-label="Enrolled students">
+              {enrollments.map((enrollment) => (
+                <li key={enrollment.id} className="rounded-xl border border-soft p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium">
+                        {enrollment.student
+                          ? `${enrollment.student.firstName} ${enrollment.student.lastName}`
+                          : "Deleted user"}
+                      </p>
+                      <p className="text-sm break-all text-muted">
+                        {enrollment.student?.email ?? "—"}
+                      </p>
+                    </div>
+                    <EnrollmentStatusBadge status={enrollment.status} />
+                  </div>
+                  <p className="mt-2 text-xs text-muted">
+                    Enrolled {new Date(enrollment.enrolledAt).toLocaleDateString()} · last
+                    seen{" "}
+                    {enrollment.lastAccessedAt
+                      ? new Date(enrollment.lastAccessedAt).toLocaleDateString()
+                      : "never"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
 
         {pagination && pagination.totalPages > 1 && (

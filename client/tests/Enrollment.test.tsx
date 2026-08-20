@@ -41,7 +41,6 @@ vi.mock("@/services/courses.service", () => ({
 // Progress.test.tsx; here it only needs to resolve.
 vi.mock("@/services/progress.service", () => ({
   progressService: {
-    completeLesson: vi.fn(),
     setLessonProgress: vi.fn(),
     getLessonProgress: vi.fn(),
     getCourseProgress: vi.fn(),
@@ -278,6 +277,7 @@ describe("StudentDashboard", () => {
         averageQuizScore: null,
         quizzesAttempted: 0,
       },
+      pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
     });
     mockedCertificates.list.mockResolvedValue({
       certificates: [],

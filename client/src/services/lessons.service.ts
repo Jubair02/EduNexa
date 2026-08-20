@@ -1,4 +1,5 @@
 import type {
+  BulkResult,
   ApiResponse,
   Lesson,
   LessonContext,
@@ -48,6 +49,19 @@ export const lessonsService = {
       { isPublished }
     );
     return unwrap(res.data).lesson;
+  },
+
+  /** Publish or unpublish several lessons in one module at once. */
+  async bulkSetStatus(
+    moduleId: string,
+    lessonIds: string[],
+    isPublished: boolean
+  ): Promise<BulkResult> {
+    const res = await api.patch<ApiResponse<BulkResult>>(
+      `/modules/${moduleId}/lessons/bulk-status`,
+      { lessonIds, isPublished }
+    );
+    return unwrap(res.data);
   },
 
   async reorder(moduleId: string, lessonIds: string[]): Promise<LessonSummary[]> {

@@ -23,7 +23,7 @@ const rowClass = (collapsed: boolean, isActive: boolean): string =>
       : "text-muted hover:bg-paper hover:text-ink"
   );
 
-/** One navigation row — a link, or a disabled row for a later-phase feature. */
+/** One navigation row. Every entry has a destination, so every row is a link. */
 const NavRow = ({
   item,
   collapsed,
@@ -34,28 +34,6 @@ const NavRow = ({
   onNavigate: () => void;
 }) => {
   const { label, icon: Icon, to } = item;
-
-  if (!to) {
-    return (
-      <Tooltip label={`${label} — coming soon`} enabled={collapsed}>
-        <div
-          aria-disabled="true"
-          title={collapsed ? `${label} — coming soon` : undefined}
-          className={cn(rowClass(collapsed, false), "cursor-not-allowed opacity-55")}
-        >
-          <Icon className="size-5 shrink-0" aria-hidden="true" />
-          {!collapsed && (
-            <>
-              <span className="flex-1 truncate">{label}</span>
-              <span className="rounded-full bg-soft px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-muted uppercase">
-                Soon
-              </span>
-            </>
-          )}
-        </div>
-      </Tooltip>
-    );
-  }
 
   return (
     <Tooltip label={label} enabled={collapsed}>

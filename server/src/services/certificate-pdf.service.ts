@@ -22,7 +22,7 @@ const COLORS = {
 const clientOrigin = (): string =>
   (env.CLIENT_URL.split(",")[0] ?? "").trim().replace(/\/$/, "");
 
-export const verificationUrl = (verificationCode: string): string =>
+const verificationUrl = (verificationCode: string): string =>
   `${clientOrigin()}/verify/certificate/${verificationCode}`;
 
 const formatDate = (value: Date): string =>

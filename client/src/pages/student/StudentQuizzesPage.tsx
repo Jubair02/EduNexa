@@ -1,4 +1,12 @@
-import { CheckCircle2, ClipboardList, Compass, Play, RotateCcw } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Compass,
+  Play,
+  RotateCcw,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { quizzesService } from "@/services/quizzes.service";
-import type { StudentQuizOverview } from "@/types";
+import type { Pagination, StudentQuizOverview } from "@/types";
 
 type LoadStatus = "loading" | "error" | "ready";
 type Filter = "all" | "outstanding" | "passed";
@@ -16,6 +24,8 @@ type Filter = "all" | "outstanding" | "passed";
 /** Every quiz across the student's courses, grouped by course. */
 export const StudentQuizzesPage = () => {
   const [quizzes, setQuizzes] = useState<StudentQuizOverview[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [page, setPage] = useState(1);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
@@ -23,12 +33,14 @@ export const StudentQuizzesPage = () => {
   const load = useCallback(async () => {
     setStatus("loading");
     try {
-      setQuizzes(await quizzesService.myQuizzes());
+      const result = await quizzesService.myQuizzes({ page, limit: 20 });
+      setQuizzes(result.quizzes);
+      setPagination(result.pagination);
       setStatus("ready");
     } catch {
       setStatus("error");
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     void load();
@@ -68,7 +80,11 @@ export const StudentQuizzesPage = () => {
           <h1 className="font-display text-3xl font-semibold">Quizzes</h1>
           <p className="mt-1 text-muted">
             {status === "ready" && quizzes.length > 0
-              ? `${passedCount} of ${quizzes.length} passed across your courses.`
+              ? // `passedCount` only covers the loaded page, so say so when there
+                // is more than one — otherwise the plain phrasing is accurate.
+                pagination && pagination.totalPages > 1
+                ? `${passedCount} of ${quizzes.length} passed on this page.`
+                : `${passedCount} of ${quizzes.length} passed across your courses.`
               : "Quizzes from every course you're enrolled in."}
           </p>
         </div>
@@ -206,6 +222,35 @@ export const StudentQuizzesPage = () => {
             </CardContent>
           </Card>
         ))}
+
+      {status === "ready" && pagination && pagination.totalPages > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-soft bg-surface px-5 py-4">
+          <p className="text-sm text-muted">
+            {pagination.total} quiz{pagination.total === 1 ? "" : "zes"} — page{" "}
+            {pagination.page} of {pagination.totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page <= 1}
+              onClick={() => setPage((current) => current - 1)}
+            >
+              <ChevronLeft className="size-4" aria-hidden="true" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+              <ChevronRight className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

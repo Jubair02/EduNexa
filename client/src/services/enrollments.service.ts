@@ -12,6 +12,10 @@ const toQuery = (params: EnrollmentListParams): Record<string, string | number> 
   const query: Record<string, string | number> = {
     page: params.page,
     limit: params.limit,
+    // Accepted by all three enrollment list endpoints; nothing was sending
+    // them until the admin table grew sortable column headers.
+    sortBy: params.sortBy,
+    sortOrder: params.sortOrder,
   };
   if (params.search.trim()) query.search = params.search.trim();
   if (params.status) query.status = params.status;

@@ -74,7 +74,17 @@ export const CourseForm = ({ course, variant, onSaved, onCancel }: CourseFormPro
     if (variant !== "admin") return;
     let cancelled = false;
     usersService
-      .list({ page: 1, limit: 100, search: "", role: "instructor", status: "active" })
+      .list({
+        page: 1,
+        limit: 100,
+        search: "",
+        role: "instructor",
+        status: "active",
+        // Alphabetical: this fills a picker, and the server's default of
+        // newest-first is the wrong order to hunt through a name list in.
+        sortBy: "firstName",
+        sortOrder: "asc",
+      })
       .then((result) => {
         if (!cancelled) setInstructors(result.users);
       })

@@ -36,7 +36,7 @@ export const CertificateCard = ({ certificate }: { certificate: Certificate }) =
     <article className="flex flex-col gap-3 rounded-2xl border border-soft bg-surface p-4 shadow-[0_1px_2px_rgba(35,26,38,0.06)] transition-colors hover:border-primary/30">
       <div className="flex items-start justify-between gap-3">
         <span className="rounded-xl bg-amber/15 p-2.5" aria-hidden="true">
-          <Award className="size-6 text-[#8a5a12]" />
+          <Award className="size-6 text-amber-strong" />
         </span>
         {isRevoked && <Badge variant="muted">Revoked</Badge>}
       </div>

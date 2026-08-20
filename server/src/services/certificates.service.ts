@@ -10,6 +10,11 @@ import { EnrollmentDocument } from "../models/enrollment.model";
 import { User, UserRole } from "../models/user.model";
 import { ApiError } from "../utils/ApiError";
 import {
+  AuditAction,
+  AuditTargetType,
+} from "../models/audit-log.model";
+import { AuditActor, recordAudit } from "./audit.service";
+import {
   generateVerificationCode,
   nextCertificateNumber,
 } from "../utils/certificate-ids";
@@ -19,6 +24,7 @@ import {
   CertificateListQuery,
   CertificateStatusInput,
 } from "../validators/certificates.validators";
+import { escapeRegex } from "../utils/escapeRegex";
 
 export interface SafeCertificate {
   id: string;
@@ -48,9 +54,6 @@ export interface PublicVerification {
   issuedAt?: Date;
   status?: CertificateStatus;
 }
-
-const escapeRegex = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const isPopulated = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !(value instanceof Types.ObjectId);
@@ -332,7 +335,8 @@ export const verifyCertificate = async (code: string): Promise<PublicVerificatio
 /** Admin-only status change; the record is never deleted. */
 export const setCertificateStatus = async (
   id: string,
-  input: CertificateStatusInput
+  input: CertificateStatusInput,
+  actor: AuditActor
 ): Promise<SafeCertificate> => {
   const certificate = await findCertificateOrThrow(id);
 
@@ -340,8 +344,25 @@ export const setCertificateStatus = async (
     throw ApiError.badRequest(`This certificate is already ${input.status}.`);
   }
 
+  const previous = certificate.status;
   certificate.status = input.status;
   await certificate.save();
+
+  await recordAudit({
+    action: AuditAction.CERTIFICATE_STATUS_CHANGED,
+    actor,
+    targetType: AuditTargetType.CERTIFICATE,
+    targetId: certificate._id,
+    targetLabel: certificate.certificateNumber,
+    summary: `${
+      input.status === CertificateStatus.REVOKED ? "Revoked" : "Restored"
+    } certificate ${certificate.certificateNumber} for ${certificate.studentName}`,
+    changes: [{ field: "status", from: previous, to: input.status }],
+    // The verification code is deliberately absent: it is the public secret
+    // that proves a certificate genuine, and the logger redacts it elsewhere.
+    metadata: { courseTitle: certificate.courseTitle },
+  });
+
   return toSafeCertificate(certificate);
 };
 
