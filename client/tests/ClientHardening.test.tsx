@@ -11,7 +11,7 @@ import { CourseThumbnail } from "@/components/CourseThumbnail";
 import { Dialog } from "@/components/ui/dialog";
 import { AuthProvider } from "@/context/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
-import { SESSION_EXPIRED_EVENT } from "@/services/api";
+import { SESSION_EXPIRED_EVENT, __resolveBaseUrl } from "@/services/api";
 import { authService } from "@/services/auth.service";
 import type { Lesson } from "@/types";
 import { safeUrl } from "@/utils/safeUrl";
@@ -285,5 +285,46 @@ describe("session expiry", () => {
 
     expect(await screen.findByText("signed out")).toBeInTheDocument();
     expect(localStorage.getItem("lms_auth_token")).toBeNull();
+  });
+});
+
+describe("API base URL resolution", () => {
+  it("uses a correctly configured absolute origin as-is", () => {
+    expect(__resolveBaseUrl("https://api.example.com/api")).toBe(
+      "https://api.example.com/api"
+    );
+  });
+
+  it("falls back to the same-origin proxy path when unset or blank", () => {
+    expect(__resolveBaseUrl(undefined)).toBe("/api");
+    expect(__resolveBaseUrl("")).toBe("/api");
+    expect(__resolveBaseUrl("   ")).toBe("/api");
+  });
+
+  it("recovers when the whole KEY=VALUE line was pasted into the value field", () => {
+    // Left alone this is not an absolute URL at all — underscores are illegal
+    // in a scheme — so every request silently went to the site's own origin.
+    expect(__resolveBaseUrl("VITE_API_URL=https://api.example.com/api")).toBe(
+      "https://api.example.com/api"
+    );
+    expect(__resolveBaseUrl("VITE_API_URL = https://api.example.com/api")).toBe(
+      "https://api.example.com/api"
+    );
+  });
+
+  it("strips the trailing newline that comes with that paste", () => {
+    expect(__resolveBaseUrl("VITE_API_URL=https://api.example.com/api\n")).toBe(
+      "https://api.example.com/api"
+    );
+    expect(__resolveBaseUrl("  https://api.example.com/api  \n")).toBe(
+      "https://api.example.com/api"
+    );
+  });
+
+  it("does not mangle a path that merely mentions the variable name", () => {
+    // Only a leading `VITE_API_URL=` is an accident; anything else is data.
+    expect(__resolveBaseUrl("https://api.example.com/VITE_API_URL=1")).toBe(
+      "https://api.example.com/VITE_API_URL=1"
+    );
   });
 });

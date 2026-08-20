@@ -15,11 +15,37 @@ export class ApiRequestError extends Error {
   }
 }
 
+/**
+ * Resolves the configured API base, defended against the two ways this value
+ * reliably arrives malformed from a hosting dashboard:
+ *
+ *   1. The whole `KEY=VALUE` line pasted into the value field, giving
+ *      "VITE_API_URL=https://api.example.com/api". `VITE_API_URL` is not a
+ *      legal URL scheme (schemes cannot contain underscores), so the browser
+ *      reads the lot as a *relative* path and quietly sends every request to
+ *      the site's own origin, where it 404s.
+ *   2. A trailing newline or stray whitespace from the same paste.
+ *
+ * Both have exactly one sensible reading, so they are corrected rather than
+ * left to fail. Genuinely wrong values still surface through the interceptor
+ * below, which names the origin that actually answered.
+ */
+const resolveBaseUrl = (configured: string | undefined): string => {
+  const cleaned = (configured ?? "")
+    .trim()
+    .replace(/^VITE_API_URL\s*=\s*/, "")
+    .trim();
+  return cleaned || "/api";
+};
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "/api",
+  baseURL: resolveBaseUrl(import.meta.env.VITE_API_URL),
   headers: { "Content-Type": "application/json" },
   timeout: 15_000,
 });
+
+/** Exported for tests — the parsing above is easy to break by accident. */
+export const __resolveBaseUrl = resolveBaseUrl;
 
 api.interceptors.request.use((config) => {
   const token = getToken();
